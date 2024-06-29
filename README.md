@@ -50,7 +50,7 @@ class DefaultPage extends \Kirby\Cms\Page
 
 > Note: You can also use the trait for user models. File models are patched automatically.
 
-## Accessing the Cache
+## Cache Driver
 
 ```php
 /** @var \Kirby\Cache\Cache $cache */
@@ -60,13 +60,24 @@ $cache->set('mykey', 'myvalue', 5); // ttl in minutes
 $value = $cache->get('mykey');
 ```
 
-## Accessing the MongoDB Client
+## MongoDB Client
 
 ```php
 /** @var \MongoDB\Client $client */
 $client = \Bnomei\Mongodb::singleton()->client();
 
 $client->listDatabases();
+```
+
+## Kirby's Content goes NoSQL
+
+The plugin writes the content cache to a collection named `khulan` in the database. You can query this collection
+directly. It is **not** wrapped in an Cache object. This allows you to treat all your Kirby content as a NoSQL database.
+
+```php
+$collection = \Bnomei\Mongodb::singleton()->collection();
+$collection->find(['_id' => 'XXX']);
+// TODO: more examples
 ```
 
 ## Settings
