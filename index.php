@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Kirby\Filesystem\F;
 use Kirby\Toolkit\Str;
+use MongoDB\Client;
 
 @include_once __DIR__.'/vendor/autoload.php';
 
@@ -11,6 +12,13 @@ load([
     'bnomei\\mongodb' => 'classes/Mongodb.php',
     'bnomei\\khulan' => 'classes/Khulan.php',
 ], __DIR__);
+
+if (! function_exists('mongodb')) {
+    function mongodb(array $options = []): Client
+    {
+        return \Bnomei\Mongodb::singleton($options)->client();
+    }
+}
 
 Kirby::plugin('bnomei/mongodb', [
     'options' => [

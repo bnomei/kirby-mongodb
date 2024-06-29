@@ -65,8 +65,27 @@ $value = $cache->get('mykey');
 ```php
 /** @var \MongoDB\Client $client */
 $client = \Bnomei\Mongodb::singleton()->client();
+$client = mongodb();
 
 $client->listDatabases();
+```
+
+## Using the Cache Driver in Kirby
+
+**site/config/config.php**
+
+```php
+return [
+    // ... other options
+    
+    // example of using mongodb as cache driver for storing uuids
+    // instead of the default file-based cache
+    'cache' => [
+        'uuid' => [
+            'type' => 'mongodb',
+        ],
+    ],
+];
 ```
 
 ## Kirby's Content goes NoSQL
@@ -76,8 +95,11 @@ directly. It is **not** wrapped in an Cache object. This allows you to treat all
 
 ```php
 $collection = \Bnomei\Mongodb::singleton()->collection();
-$collection->find(['_id' => 'XXX']);
+// TODO get khulan collection
+$khulan = khulan();
+$whatGetReturned = $khulan->find(['uuid' => 'XXX']);
 // TODO: more examples
+$whatGetReturned = $khulan->find(['category' => 'books']);
 ```
 
 ## Settings
