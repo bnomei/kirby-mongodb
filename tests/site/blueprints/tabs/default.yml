@@ -1,0 +1,25 @@
+sections:
+  content:
+    type: fields
+    fields:
+      text:
+        type: text
+        width: 1/2
+      text_non_translated:
+        type: text
+        translate: false
+        width: 1/2
+      tags:
+        type: tags
+      category:
+        type: radio
+        columns: 2
+        options:
+          books: Books
+          movies: Movies
+      related:
+        type: pages
+  pages:
+    type: pages
+  files:
+    type: files

@@ -9,72 +9,58 @@ use Kirby\Cache\Value;
 use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
 use MongoDB\Client;
+use MongoDB\Collection;
+use MongoDB\Model\BSONDocument;
+
+use function option;
 
 final class Mongodb extends Cache
 {
-    private $shutdownCallbacks = [];
+    protected Client $_client;
 
     /**
-     * store for the connection
-     * @var Client;
+     * Sets all parameters which are needed to connect to MongoDB.
      */
-    protected $_client;
-
-    /**
-     * Sets all parameters which are needed to connect to Redis
-     */
-    public function __construct(array $options = [], array $optionsClient = [])
+    public function __construct(array $options = [])
     {
         $this->options = array_merge([
-            'debug' => \option('debug'),
-            'host' => \option('bnomei.mongodb.host'),
-            'port' => \option('bnomei.mongodb.port'),
+            'debug' => option('debug'),
+            'host' => option('bnomei.mongodb.host'),
+            'port' => option('bnomei.mongodb.port'),
+            'database' => option('bnomei.mongodb.database'),
+            'username' => option('bnomei.mongodb.username'),
+            'password' => option('bnomei.mongodb.password'),
+            'collection-cache' => option('bnomei.mongodb.collections.cache'),
+            'collection-content' => option('bnomei.mongodb.collections.content'),
         ], $options);
 
         foreach ($this->options as $key => $call) {
-            if (!is_string($call) && is_callable($call) && in_array($key, [
-                    'host', 'port', 'database', 'password',
-                ])) {
+            if (! is_string($call) && is_callable($call) && in_array($key, [
+                'host', 'port', 'database', 'username', 'password',
+            ])) {
                 $this->options[$key] = $call();
             }
         }
 
         parent::__construct($this->options);
 
+        if (! empty($this->options['username']) && ! empty($this->options['password'])) {
+            $auth = $this->options['username'].':'.$this->options['password'].'@';
+        } else {
+            $auth = '';
+        }
+
         $this->_client = new Client(
-            'mongodb://' . $this->options['host'] . ':' . $this->options['port']
+            'mongodb://'.$auth.$this->options['host'].':'.$this->options['port']
         );
+        $this->_client->selectDatabase($this->options['database']);
 
         if ($this->option('debug')) {
             $this->flush();
         }
     }
 
-    public function register_shutdown_function($callback)
-    {
-        $this->shutdownCallbacks[] = $callback;
-    }
-
-    public function __destruct()
-    {
-        foreach ($this->shutdownCallbacks as $callback) {
-            if (!is_string($callback) && is_callable($callback)) {
-                $callback();
-            }
-        }
-
-        if ($this->option('debug')) {
-            return;
-        }
-    }
-
-    public function client(): Client
-    {
-        return $this->_client;
-    }
-
     /**
-     * @param string|null $key
      * @return array
      */
     public function option(?string $key = null)
@@ -82,11 +68,19 @@ final class Mongodb extends Cache
         if ($key) {
             return A::get($this->options, $key);
         }
+
         return $this->options;
     }
 
+    public function key(string $key): string
+    {
+        $key = parent::key($key);
+
+        return hash('xxh3', $key);
+    }
+
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function set(string $key, $value, int $minutes = 0): bool
     {
@@ -96,38 +90,39 @@ final class Mongodb extends Cache
         }
         */
 
-        $key = $this->key($key);
-        $value = (new Value($value, $minutes))->toJson();
-
-        $status = $method->set(
-            $key,
-            $value
+        $document = $this->cacheCollection()->findOneAndUpdate(
+            ['_id' => $this->key($key)],
+            ['$set' => (new Value($value, $minutes))->toArray() + [
+                'expires_at' => $minutes ? time() + $minutes * 60 : null,
+            ]],
+            ['upsert' => true]
         );
 
-        if ($minutes) {
-            $status = $method->expireat(
-                $key,
-                $this->expiration($minutes)
-            );
-        }
-
-
-        return $status == 'OK' || $status == 'QUEUED';
+        return $document !== null;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function retrieve(string $key): ?Value
     {
-        $key = $this->key($key);
+        $value = $value ?? $this->cacheCollection()->findOne([
+            '_id' => $this->key($key),
+        ]);
 
-        $value = $value ?? $this->_client->get($key);
-
-        if ($value instanceof Status && $value->getPayload() === 'QUEUED') {
-            $value = null;
+        if (! $value) {
+            return null;
         }
-        $value = is_string($value) ? Value::fromJson($value) : $value;
+
+        if (is_array($value)) {
+            $value = $value[0];
+        }
+
+        if ($value instanceof BSONDocument) {
+            $value = $value->getArrayCopy();
+        }
+
+        $value = is_array($value) ? Value::fromArray($value) : $value;
 
         return $value;
     }
@@ -142,92 +137,96 @@ final class Mongodb extends Cache
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function remove(string $key): bool
     {
-        $key = $this->key($key);
-
-        $status = $this->_client->del($key);
-        if (is_int($status)) {
-            return $status > 0;
-        }
-        if (is_string($status)) {
-            return $status === 'QUEUED';
-        }
-        return false;
-    }
-
-    public function key(string $key): string
-    {
-        $key = parent::key($key);
-        return $this->option('key')($key);
+        return $this->cacheCollection()->deleteOne([
+            '_id' => $this->key($key),
+        ])->isAcknowledged();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function flush(): bool
     {
-        $prefix = $this->key('');
-        $keys = $this->_client->keys($prefix . '*');
-        $this->_client->del($keys);
-
-        return true;
-    }
-
-    public function flushdb(): bool
-    {
-        return $this->_client->flushdb() == 'OK';
+        return $this->cacheCollection()->deleteMany([])->isAcknowledged();
     }
 
     public function benchmark(int $count = 10)
     {
-        $prefix = "mongodb-benchmark-";
+        $prefix = 'mongodb-benchmark-';
         $mongodb = $this;
         $file = kirby()->cache('bnomei.mongodb'); // neat, right? ;-)
 
         foreach (['mongodb' => $mongodb, 'file' => $file] as $label => $driver) {
             $time = microtime(true);
             for ($i = 0; $i < $count; $i++) {
-                $key = $prefix . $i;
-                if (!$driver->get($key)) {
+                $key = $prefix.$i;
+                if (! $driver->get($key)) {
                     $driver->set($key, Str::random(1000));
                 }
             }
             for ($i = $count * 0.6; $i < $count * 0.8; $i++) {
-                $key = $prefix . $i;
+                $key = $prefix.$i;
                 $driver->remove($key);
             }
             for ($i = $count * 0.8; $i < $count; $i++) {
-                $key = $prefix . $i;
+                $key = $prefix.$i;
                 $driver->set($key, Str::random(1000));
             }
-            echo $label . ' : ' . (microtime(true) - $time) . PHP_EOL;
+            echo $label.' : '.(microtime(true) - $time).PHP_EOL;
 
             // cleanup
             for ($i = 0; $i < $count; $i++) {
-                $key = $prefix . $i;
+                $key = $prefix.$i;
                 $driver->remove($key);
             }
         }
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function root(): string
     {
         return kirby()->cache('bnomei.mongodb')->root();
     }
 
-    private static $singleton;
-
-    public static function singleton(array $options = [], array $optionsClient = []): self
+    public function cache(): self
     {
-        if (!static::$singleton) {
-            static::$singleton = new self($options, $optionsClient);
+        return $this;
+    }
+
+    public function client(): Client
+    {
+        return $this->_client;
+    }
+
+    public function collection(string $collection): Collection
+    {
+        return $this->_client->selectCollection($this->options['database'], $collection);
+    }
+
+    public function cacheCollection(): Collection
+    {
+        return $this->collection($this->options['collection-cache']);
+    }
+
+    public function contentCollection(): Collection
+    {
+        return $this->collection($this->options['collection-content']);
+    }
+
+    public static $singleton;
+
+    public static function singleton(array $options = []): self
+    {
+        if (! self::$singleton) {
+            self::$singleton = new self($options);
         }
-        return static::$singleton;
+
+        return self::$singleton;
     }
 }

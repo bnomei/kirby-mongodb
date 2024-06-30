@@ -6,5 +6,5 @@ namespace Bnomei;
 
 class KhulanFile extends \Kirby\Cms\File
 {
-    use Khulan;
+    //    use ModelWithKhulan; // TODO: breaks stuff
 }

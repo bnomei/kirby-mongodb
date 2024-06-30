@@ -2,7 +2,7 @@
     "name": "bnomei/kirby-mongodb",
     "type": "kirby-plugin",
     "version": "1.0.0",
-    "description": "Khulan is a cache driver and content cache for Kirby using MongoDB",
+    "description": "Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB",
     "license": "MIT",
     "authors": [
         {
@@ -41,14 +41,16 @@
     "require": {
         "php": ">=8.2.0",
         "getkirby/composer-installer": "^1.2",
-        "mongodb/mongodb": "^1.19"
+        "mongodb/mongodb": "^1.19",
+        "ext-mongodb": "*"
     },
     "require-dev": {
         "getkirby/cms": "^4.3.0",
         "larastan/larastan": "^2.9",
         "laravel/pint": "^1.13",
         "pestphp/pest": "^2.24",
-        "pestphp/pest-plugin-type-coverage": "^2.4"
+        "pestphp/pest-plugin-type-coverage": "^2.4",
+        "spatie/ray": "^1.41"
     },
     "scripts": {
         "analyze": "./vendor/bin/phpstan",

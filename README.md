@@ -6,7 +6,7 @@
 [![Maintainability](https://flat.badgen.net/codeclimate/maintainability/bnomei/kirby-mongodb)](https://codeclimate.com/github/bnomei/kirby-mongodb)
 [![Twitter](https://flat.badgen.net/badge/twitter/bnomei?color=66d9ef)](https://twitter.com/bnomei)
 
-Khulan is a cache driver and content cache for Kirby using MongoDB.
+Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB.
 
 ## Commercial Usage
 
@@ -29,11 +29,26 @@ Khulan is a cache driver and content cache for Kirby using MongoDB.
 - `git submodule add https://github.com/bnomei/kirby-mongodb.git site/plugins/kirby-mongodb` or
 - `composer require bnomei/kirby-mongodb`
 
+## MongoDB
+
+There are various ways to install [MongoDB](https://www.mongodb.com/). This is one way to do it on localhost for Mac OSX
+using Homebrew and MongoDB Atlas.
+
+```sh
+brew install mongodb-atlas
+atlas setup # create account and sign-in
+atlas deployments setup # -> select localhost
+alias deployments start # start the local mongodb
+```
+
 ## Usecase
 
 The plugin caches all content files and keeps the cache up to date when you add/remove or update content. This cache
 will be used when constructing page/file/user objects making everything that involves model faster (even the
 Panel).
+
+It will also allow you to query the content cache directly as a NoSQL database which might be very useful for some
+use-cases like filtering or searching content.
 
 ## Setup
 
@@ -44,30 +59,105 @@ For each template you want to be cached you need to use a model to add the conte
 ```php
 class DefaultPage extends \Kirby\Cms\Page
 {
-    use \Bnomei\Khulan;
+    use \Bnomei\ModelWithKhulan;
 }
 ```
 
 > Note: You can also use the trait for user models. File models are patched automatically.
 
-## Cache Driver
+## Kirby's Content goes NoSQL
+
+The plugin writes the content cache to a collection named `khulan` in the database. You can query this collection
+directly. It is **not** wrapped in an Cache object. This allows you to treat all your Kirby content as a NoSQL database.
 
 ```php
-/** @var \Kirby\Cache\Cache $cache */
-$cache = \Bnomei\Mongodb::singleton();
+// using the collection
+$document = khulan()->find(['uuid' => 'XXX']);
 
-$cache->set('mykey', 'myvalue', 5); // ttl in minutes
-$value = $cache->get('mykey');
+// find a single page by uuid string
+$page = khulan((string) $myIdOrUUID);
+
+// find a single page by uuid by field-key
+$page = khulan(['uuid' => 'page://betterharder']);
+
+// find all pages with a template
+$pages = khulan(['template' => 'post']);
+
+// find all pages that have another page linked
+$pages = khulan([
+    'related[]' => ['$in' => ['page://fasterstronger']],
+]);
+
+// find all products in the category 'books' or 'movies'
+// that had been modified within the last 7 days
+$pages = khulan([
+    'template' => 'product',
+    'category[,]' => ['$in' => ['books', 'movies']],
+    'modified' => ['$gt' => time() - (7 * 24 * 60 * 60)]
+]);
 ```
 
 ## MongoDB Client
 
+You can access the underlying MongoDB client directly.
+
 ```php
 /** @var \MongoDB\Client $client */
 $client = \Bnomei\Mongodb::singleton()->client();
-$client = mongodb();
+$client = mongo()->client();
 
-$client->listDatabases();
+$collection = $client->selectCollection('my-database', 'my-collection');
+```
+
+## Cache
+
+You can either use the *cache* directly or use it as a *cache driver* for Kirby.
+
+The MongoDB based cache will, compared to the default
+file-based cache, perform **worse**! This is to be expected as web-servers are optimized for handling requests to a
+couple of hundred files and keep them in memory.
+
+```php
+$cache = mongo()->cache();
+
+$cache->set('mykey', 'myvalue', 5); // ttl in minutes
+$value = $cache->get('mykey');
+
+$cache->set('tagging', [
+    'tags' => ['tag1', 'tag2'],
+    'value' => 'myvalue',
+]);
+```
+
+As with regular Kirby cache you can also use the `getOrSet` method to wrap your time expensive code into a closure and
+only execute it when the cache is empty.
+
+```php
+$cache = mongo()->cache();
+
+$value = $cache->getOrSet('mykey', function() {
+    sleep(5); // like a API call, database query or filtering content
+    return 'myvalue';
+}, 5); 
+```
+
+Using the MongoDB-based cache will allow you to perform NoSQL queries on the cache and do advanced stuff like
+filtering my tags or invalidating many cache entries at once.
+
+```php
+// NOTE: we are using the cacheCollection() method here
+$collection = mongo()->cacheCollection();
+
+// find all that have the tag 'tag1'
+$documents = $collection->find([
+    'tags' => ['$in' => ['tag1']],
+]);
+
+// delete any cache entry older than 5 minutes
+$deleteResult = $collection->deleteMany([
+    'expires_at' => ['$lt' => time() - 5*60]
+]);
+$deletedCount = $deleteResult->getDeletedCount();
 ```
 
 ## Using the Cache Driver in Kirby
@@ -88,26 +178,15 @@ return [
 ];
 ```
 
-## Kirby's Content goes NoSQL
-
-The plugin writes the content cache to a collection named `khulan` in the database. You can query this collection
-directly. It is **not** wrapped in an Cache object. This allows you to treat all your Kirby content as a NoSQL database.
-
-```php
-$collection = \Bnomei\Mongodb::singleton()->collection();
-// TODO get khulan collection
-$khulan = khulan();
-$whatGetReturned = $khulan->find(['uuid' => 'XXX']);
-// TODO: more examples
-$whatGetReturned = $khulan->find(['category' => 'books']);
-```
-
 ## Settings
 
 | bnomei.mongodb.          | Default     | Description                                                                  |            
 |--------------------------|-------------|------------------------------------------------------------------------------|
 | host                     | `127.0.0.1` |                                                                              |
 | port                     | `27017`     |                                                                              |
+| username                 | `null`      |                                                                              |
+| password                 | `null`      |                                                                              |
+| database                 | `kirby`     |                                                                              |
 | khulan.read              | `true`      | read from cache                                                              |
 | khulan.write             | `true`      | write to cache                                                               |
 | khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching it content |

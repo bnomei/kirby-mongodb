@@ -6,5 +6,5 @@ namespace Bnomei;
 
 class KhulanPage extends \Kirby\Cms\Page
 {
-    use Khulan;
+    use ModelWithKhulan;
 }

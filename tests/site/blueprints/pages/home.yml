@@ -1,0 +1,4 @@
+title: Home
+
+tabs:
+  extends: tabs/default

@@ -26,5 +26,5 @@
         <report>
             <clover outputFile="tests/logs/clover.xml"/>
         </report>
-    </coverage>
+    </source>
 </phpunit>

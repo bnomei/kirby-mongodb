@@ -1,130 +1,102 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Bnomei;
 
-use Kirby\Filesystem\F;
-use Kirby\Toolkit\Str;
+use Kirby\Cms\Collection;
+use Kirby\Cms\File;
+use Kirby\Cms\Files;
+use Kirby\Cms\Page;
+use Kirby\Cms\Pages;
+use Kirby\Cms\Site;
+use Kirby\Cms\User;
+use Kirby\Cms\Users;
+use Kirby\Toolkit\A;
 
-trait Khulan
+class Khulan
 {
-    /** @var bool */
-    private bool $khulanCacheWillBeDeleted;
-
-    public function hasKhulan(): bool
+    public static function index(): array
     {
+        $count = 0;
+        $hash = [];
+
+        // reading a field like the title will make sure
+        // that the page is loaded and cached
+        foreach (site()->index(true) as $page) {
+            $hash[] = $page->title()->value();
+            $count++;
+        }
+        // TODO: files, users
+
+        return [
+            'count' => $count,
+            'hash' => hash('xxh3', implode('|', $hash)),
+        ];
+    }
+
+    public static function flush(): bool
+    {
+        mongo()->contentCollection()->drop();
+
         return true;
     }
 
-    public function setBoostWillBeDeleted(bool $value): void
+    public static function documentsToModels(iterable $documents): Collection|Pages|Files|Users|null
     {
-        $this->khulanCacheWillBeDeleted = $value;
-    }
+        $documents = iterator_to_array($documents);
 
-    public function keyKhulan(?string $languageCode = null): string
-    {
-        $key = hash('xxh3', $this->id()); // can not use UUID since content not loaded yet
-        if (! $languageCode) {
-            $languageCode = kirby()->languages()->count() ? kirby()->language()->code() : null;
-        }
-        if ($languageCode) {
-            $key = $key.'-'.$languageCode;
+        if (empty($documents)) {
+            return null;
         }
 
-        return $key;
-    }
+        $models = [];
 
-    public function readContentCache(?string $languageCode = null): ?array
-    {
-        // TODO: change to direct client findByID
-        return Mongodb::singleton()->get(
-            $this->keyKhulan($languageCode).'-content',
-            null
-        );
-    }
+        foreach ($documents as $document) {
+            $models[] = self::documentToModel($document);
+        }
 
-    public function readContent(?string $languageCode = null): array
-    {
-        // read from boostedCache if exists
-        $data = option('bnomei.mongodb.khulan.read') === false || option('debug') ? null : $this->readContentCache($languageCode);
+        $models = array_filter($models, function ($obj) {
+            return $obj !== null;
+        });
 
-        // read from file and update boostedCache
-        if (! $data) {
-            $data = parent::readContent($languageCode);
-            if ($data && $this->khulanCacheWillBeDeleted !== true) {
-                $this->writeKhulan($data, $languageCode);
+        $modelTypes = array_count_values(array_map(function ($document) {
+            return $document['modelType'];
+        }, $documents));
+
+        if (count($modelTypes) === 1) {
+            $modelType = array_key_first($modelTypes);
+            if ($modelType === 'file') {
+                return new Files($models);
+            } elseif ($modelType === 'user') {
+                return new Users($models);
+            } elseif ($modelType === 'page') {
+                return new Pages($models);
             }
+        } else {
+            return new Collection($models);
         }
 
-        return $data;
+        return null;
     }
 
-    public function writeKhulan(?array $data = null, ?string $languageCode = null): bool
+    public static function documentToModel($document = null): Page|File|User|Site|null
     {
-        $cache = Mongodb::singleton();
-        if (! $cache || option('bnomei.mongodb.khulan.write') === false) {
-            return true;
+        if (! $document) {
+            return null;
         }
 
-        $modified = $this->modified();
+        if ($document['modelType'] === 'file') {
+            return kirby()->file($document['id']);
+        } elseif ($document['modelType'] === 'user') {
+            return kirby()->user($document['id']);
+        } elseif ($document['modelType'] === 'site') {
+            return kirby()->site();
+        } elseif ($document['modelType'] === 'page') {
+            $document = iterator_to_array($document);
+            $id = A::get($document, 'uuid', A::get($document, 'id'));
 
-        // in rare case file does not exists or is not readable
-        if ($modified === false) {
-            $this->deleteKhulan(); // whatever was in the cache is no longer valid
-
-            return false; // try again another time
+            return kirby()->page($id);
         }
 
-        // TODO: change to direct client insertOne
-        return $cache->set(
-            $this->keyKhulan($languageCode).'-content',
-            array_filter($data, fn ($content) => $content !== null),
-            option('bnomei.mongodb.expire')
-        );
-    }
-
-    public function writeContent(array $data, ?string $languageCode = null): bool
-    {
-        // write to file and cache
-        return parent::writeContent($data, $languageCode) &&
-            $this->writeKhulan($data, $languageCode);
-    }
-
-    public function deleteKhulan(): bool
-    {
-        $cache = Mongodb::singleton();
-        if (! $cache) {
-            return true;
-        }
-
-        $this->setBoostWillBeDeleted(true);
-
-        foreach (kirby()->languages() as $language) {
-            // TODO: change to direct client deleteByID
-            $cache->remove(
-                $this->keyKhulan($language->code()).'-content'
-            );
-        }
-
-        // TODO: change to direct client deleteByID
-        $cache->remove(
-            $this->keyKhulan().'-content'
-        );
-
-        return true;
-    }
-
-    public function delete(bool $force = false): bool
-    {
-        $cache = Mongodb::singleton();
-        if (! $cache) {
-            return parent::delete($force);
-        }
-
-        $success = parent::delete($force);
-        $this->deleteKhulan();
-
-        return $success;
+        return null;
     }
 }

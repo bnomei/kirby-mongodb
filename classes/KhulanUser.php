@@ -6,5 +6,5 @@ namespace Bnomei;
 
 class KhulanUser extends \Kirby\Cms\User
 {
-    use Khulan;
+    use ModelWithKhulan;
 }

@@ -2,21 +2,50 @@
 
 declare(strict_types=1);
 
+use Bnomei\Khulan;
 use Kirby\Filesystem\F;
 use Kirby\Toolkit\Str;
-use MongoDB\Client;
+use MongoDB\Collection;
 
 @include_once __DIR__.'/vendor/autoload.php';
 
 load([
     'bnomei\\mongodb' => 'classes/Mongodb.php',
     'bnomei\\khulan' => 'classes/Khulan.php',
+    'bnomei\\modelwithkhulan' => 'classes/ModelWithKhulan.php',
 ], __DIR__);
 
-if (! function_exists('mongodb')) {
-    function mongodb(array $options = []): Client
+if (! function_exists('mongo')) {
+    function mongo(?string $collection = null): \Bnomei\Mongodb|Collection
     {
-        return \Bnomei\Mongodb::singleton($options)->client();
+        if (! $collection) {
+            return \Bnomei\Mongodb::singleton();
+        }
+
+        return \Bnomei\Mongodb::singleton()->collection($collection);
+    }
+}
+
+if (! function_exists('khulan')) {
+
+    function khulan(string|array|null $search = null): mixed
+    {
+        $collection = \Bnomei\Mongodb::singleton()->contentCollection();
+
+        if (is_array($search)) {
+            return Khulan::documentsToModels($collection->find($search));
+
+        } elseif (is_string($search)) {
+            return Khulan::documentToModel($collection->findOne([
+                '$or' => [
+                    ['_id' => $search],
+                    ['id' => $search],
+                    ['uuid' => $search],
+                ],
+            ]));
+        }
+
+        return $collection;
     }
 }
 
@@ -25,15 +54,25 @@ Kirby::plugin('bnomei/mongodb', [
         // plugin
         'cache' => true,
 
+        // mongodb
+        'host' => '127.0.0.1',
+        'port' => 27017,
+        'database' => 'kirby',
+        'username' => null,
+        'password' => null,
+
+        // collections
+        'collections' => [
+            'cache' => 'cache',
+            'content' => 'kirby',
+        ],
+
+        // khulan
         'khulan' => [ // cache for models
             'read' => true,
             'write' => true,
             'patch-files-class' => true, // monkey patch files class
         ],
-
-        // mongodb
-        'host' => '127.0.0.1',
-        'port' => 27017,
     ],
     'cacheTypes' => [
         'mongodb' => \Bnomei\Mongodb::class,
