@@ -169,8 +169,6 @@ $deleteResult = $collection->deleteMany([
 $deletedCount = $deleteResult->getDeletedCount();
 ```
 
-> ⚠️ The stored value is a JSON encoded instance of the Kirby\Cache\Value class and pretty much useless for querying.
-
 ## Using the Cache Driver in Kirby
 
 You can also use the MongoDB-based cache as a **cache driver** for Kirby. This will allow you to use it for caching of

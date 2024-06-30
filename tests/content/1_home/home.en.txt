@@ -1,0 +1,13 @@
+Title: Home
+
+----
+
+Text: Home EN
+
+----
+
+Text-non-translated: Home NT
+
+----
+
+Uuid: home
