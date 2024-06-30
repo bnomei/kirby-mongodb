@@ -38,7 +38,7 @@ using Homebrew and MongoDB Atlas.
 brew install mongodb-atlas
 atlas setup # create account and sign-in
 atlas deployments setup # -> select localhost
-alias deployments start # start the local mongodb
+atlas deployments start # start the local mongodb
 ```
 
 ## Usecase
@@ -82,7 +82,17 @@ $page = khulan(['uuid' => 'page://betterharder']);
 
 // find all pages with a template
 $pages = khulan(['template' => 'post']);
+```
 
+### Special Fields with [] and [,]
+
+The plugin creates modified copies of a few field types to make the YAML based content from Kirby ready for queries.
+You can use
+
+- `fieldname[]` to query for a value in an array from pages/files/user fields and
+- `fieldname[,]` to query for fields in comma separated strings like tags/select/radio/checkbox/multiselect fields.
+
+```php
 // find all pages that have another page linked
 $pages = khulan([
     'related[]' => ['$in' => ['page://fasterstronger']],
@@ -111,11 +121,10 @@ $collection = $client->selectCollection('my-database', 'my-collection');
 
 ## Cache
 
-You can either use the *cache* directly or use it as a *cache driver* for Kirby.
+You can either use the **cache** directly or use it as a **cache driver** for Kirby.
 
-The MongoDB based cache will, compared to the default
-file-based cache, perform **worse**! This is to be expected as web-servers are optimized for handling requests to a
-couple of hundred files and keep them in memory.
+The MongoDB based cache will, compared to the default file-based cache, perform **worse**! This is to be expected as
+web-servers are optimized for handling requests to a couple of hundred files and keep them in memory.
 
 ```php
 $cache = mongo()->cache();
@@ -160,7 +169,12 @@ $deleteResult = $collection->deleteMany([
 $deletedCount = $deleteResult->getDeletedCount();
 ```
 
+> ⚠️ The stored value is a JSON encoded instance of the Kirby\Cache\Value class and pretty much useless for querying.
+
 ## Using the Cache Driver in Kirby
+
+You can also use the MongoDB-based cache as a **cache driver** for Kirby. This will allow you to use it for caching of
+other extensions in Kirby.
 
 **site/config/config.php**
 

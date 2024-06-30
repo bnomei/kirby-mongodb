@@ -89,7 +89,7 @@ it('can find a page by id and uuid', function () {
 it('can find all pages with the same template', function () {
     Khulan::index();
 
-    $pages = khulan(['template' => 'default']);
+    $pages = khulan(['template' => 'default', 'language' => 'en']);
 
     expect($pages->count())->toBe(2);
 });
