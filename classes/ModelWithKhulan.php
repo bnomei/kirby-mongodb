@@ -108,8 +108,6 @@ trait ModelWithKhulan
             unset($data['_id']);
         }
 
-        ray('write', $data)->red();
-
         $status = khulan()->findOneAndUpdate(
             ['_id' => $this->keyKhulan($languageCode)],
             ['$set' => $data],
