@@ -63,7 +63,8 @@ class DefaultPage extends \Kirby\Cms\Page
 }
 ```
 
-> Note: You can also use the trait for user models. File models are patched automatically.
+> [!NOTE]
+> You can also use the trait for user models. File models are patched automatically.
 
 ## Kirby's Content goes NoSQL
 
@@ -84,18 +85,25 @@ $page = khulan(['uuid' => 'page://betterharder']);
 $pages = khulan(['template' => 'post']);
 ```
 
-### Special Fields with [] and [,]
+> [!WARNING]
+> The khulan()-helper is currently only tested for Pages. Files and Users might work or not.
+
+### Special Fields with [], {} and [,]
 
 The plugin creates modified copies of a few field types to make the YAML based content from Kirby ready for queries.
 You can use
 
 - `fieldname[]` to query for a value in an array from pages/files/user fields and
+- `fieldname{}` to query for an objectId in an array from pages/files/user fields and
 - `fieldname[,]` to query for fields in comma separated strings like tags/select/radio/checkbox/multiselect fields.
 
 ```php
 // find all pages that have another page linked
 $pages = khulan([
     'related[]' => ['$in' => ['page://fasterstronger']],
+]);
+$pages = khulan([
+    'related{}' => ['$in' => ['dc9f7835c2400cc4']], // objectId
 ]);
 
 // find all products in the category 'books' or 'movies'
