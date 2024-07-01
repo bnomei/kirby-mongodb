@@ -20,7 +20,7 @@ trait ModelWithKhulan
         return true;
     }
 
-    public function setBoostWillBeDeleted(bool $value): void
+    public function setKhulanCacheWillBeDeleted(bool $value): void
     {
         $this->khulanCacheWillBeDeleted = $value;
     }
@@ -101,7 +101,7 @@ trait ModelWithKhulan
             'language' => $languageCode,
             'modelType' => $modelType,
         ];
-        $data = $this->encodeKhulan($data) + $meta;
+        $data = $this->encodeKhulan($data, $languageCode) + $meta;
 
         // _id is not allowed as data key
         if (array_key_exists('_id', $data)) {
@@ -131,7 +131,7 @@ trait ModelWithKhulan
             return true;
         }
 
-        $this->setBoostWillBeDeleted(true);
+        $this->setKhulanCacheWillBeDeleted(true);
 
         // using many and by id to delete all language versions
         // as well as the version without a language code
@@ -155,7 +155,7 @@ trait ModelWithKhulan
         return $success;
     }
 
-    public function encodeKhulan(array $data): array
+    public function encodeKhulan(array $data, ?string $languageCode = null): array
     {
         // foreach each key value pairs
         $copy = $data;
@@ -175,7 +175,56 @@ trait ModelWithKhulan
 
                 // if it is a valid yaml string, convert it to an array
                 if (in_array(
-                    $type, ['pages', 'files', 'users', 'object', 'structure']
+                    $type, ['pages', 'files', 'users']
+                )) {
+                    try {
+                        $v = Yaml::decode($value);
+                        if (is_array($v)) {
+                            $copy[$key.'[]'] = $v;
+                            $copy[$key.'{}'] = [];
+                            // resolve each and set objectid
+                            foreach ($v as $vv) {
+                                $modelType = null;
+                                if (Str::startsWith($vv, 'page://')) {
+                                    $modelType = 'page';
+                                } elseif (Str::startsWith($vv, 'file://')) {
+                                    $modelType = 'file';
+                                } elseif (Str::startsWith($vv, 'user://')) {
+                                    $modelType = 'user';
+                                } elseif (Str::startsWith($vv, 'site://')) {
+                                    $modelType = 'site';
+                                }
+                                if (! $modelType) {
+                                    continue;
+                                }
+                                $vv = str_replace($modelType.'://', '', $vv);
+                                $query = [
+                                    '$or' => [
+                                        ['id' => $vv],
+                                        ['uuid' => $vv],
+                                    ],
+                                ];
+                                if (kirby()->multilang() && $languageCode) {
+                                    $query = [
+                                        '$and' => [
+                                            $query,
+                                            ['language' => $languageCode],
+                                        ],
+                                    ];
+                                }
+                                $document = khulan()->findOne($query);
+                                if ($document) {
+                                    $copy[$key.'{}'][] = $document['_id'];
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // do nothing
+                    }
+                }
+                // if it is a valid yaml string, convert it to an array
+                if (in_array(
+                    $type, ['object', 'structure']
                 )) {
                     try {
                         $v = Yaml::decode($value);

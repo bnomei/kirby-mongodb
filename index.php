@@ -79,6 +79,11 @@ Kirby::plugin('bnomei/mongodb', [
     ],
     'hooks' => [
         'system.loadPlugins:after' => function () {
+            if (option('bnomei.mongodb.khulan.read') &&
+                option('bnomei.mongodb.khulan.write') &&
+                khulan()->countDocuments() === 0) {
+                Khulan::index();
+            }
             if (option('bnomei.mongodb.khulan.patch-files-class')) {
                 $filesClass = kirby()->roots()->kirby().'/src/Cms/Files.php';
                 if (F::exists($filesClass) && F::isWritable($filesClass)) {

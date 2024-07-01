@@ -68,12 +68,35 @@ it('can use the cache', function () {
     expect($value)->toBe('value');
 });
 
+it('will not use the cache in debug mode', function () {
+    Mongodb::$singleton = null;
+
+    $mongodb = Mongodb::singleton([
+        'debug' => true,
+    ]);
+
+    expect($mongodb->option('debug'))->toBeTrue();
+
+    $mongodb->set('test', 'value');
+    expect($mongodb->get('test'))->toBeNull();
+
+    Mongodb::$singleton = null;
+});
+
 it('can use the cache with expiration', function () {
     $mongodb = mongo();
     $mongodb->set('test', 'value', 1);
     $value = $mongodb->get('test');
 
     expect($value)->toBe('value');
+});
+
+it('can use a closure in the cache', function () {
+    $mongodb = mongo();
+    $mongodb->getOrSet('swatch', fn () => date('B'));
+    $value = $mongodb->get('swatch');
+
+    expect($value)->toBeNumeric();
 });
 
 it('can find a page by id and uuid', function () {

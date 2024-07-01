@@ -14,23 +14,53 @@ use Kirby\Toolkit\A;
 
 class Khulan
 {
-    public static function index(): array
+    public static function index(int $iterations = 2): array
     {
         $count = 0;
         $hash = [];
 
         // reading a field like the title will make sure
         // that the page is loaded and cached
+        /** @var Page $page */
         foreach (site()->index(true) as $page) {
-            $hash[] = $page->title()->value();
+            if ($page->hasKhulan() !== true) {
+                continue;
+            }
+            if (kirby()->multilang()) {
+                foreach (kirby()->languages() as $language) {
+                    $content = $page->content($language->code())->toArray();
+                    $hash[] = $content['title'];
+                    $page->writeKhulan($content, $language->code());
+                }
+            } else {
+                $hash[] = $page->title()->value();
+                $page->writeKhulan($page->content()->toArray());
+            }
             $count++;
         }
         // TODO: files, users
 
-        return [
+        $meta = [
             'count' => $count,
             'hash' => hash('xxh3', implode('|', $hash)),
         ];
+
+        // call twice by default to make it possible to resolve relations
+        if ($iterations > 1) {
+            $iterations--;
+            $meta = self::index($iterations);
+        }
+
+        // add indexes for better performance
+        if ($iterations === 1) {
+            khulan()->createIndex(['id' => 1]);
+            khulan()->createIndex(['uuid' => 1]);
+            khulan()->createIndex(['language' => 1]);
+            khulan()->createIndex(['template' => 1]);
+            khulan()->createIndex(['modelType' => 1]);
+        }
+
+        return $meta;
     }
 
     public static function flush(): bool
@@ -92,7 +122,7 @@ class Khulan
             return kirby()->site();
         } elseif ($document['modelType'] === 'page') {
             $document = iterator_to_array($document);
-            $id = A::get($document, 'uuid', A::get($document, 'id'));
+            $id = A::get($document, 'id', A::get($document, 'uuid'));
 
             return kirby()->page($id);
         }
