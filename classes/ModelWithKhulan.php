@@ -275,6 +275,11 @@ trait ModelWithKhulan
             }
         }
 
+        // remove any empty values
+        $copy = array_filter($copy, function ($value) {
+            return ! empty($value);
+        });
+
         return $copy;
     }
 }
