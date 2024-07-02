@@ -165,7 +165,7 @@ trait ModelWithKhulan
 
                 // if it is a comma separated list unroll it to an array. validate if it is with a regex but allow for spaces chars after the comma
 
-                if (preg_match('/^[\w-]+(,\s*[\w-]+)*$/', $value) && in_array(
+                if (preg_match('/^[\w\s-]+(,\s*[\w\s-]+)*$/', $value) && in_array(
                     $type, ['tags', 'select', 'multiselect', 'radio', 'checkbox']
                 )) {
                     $copy[$key.'[,]'] = explode(',', $value);
