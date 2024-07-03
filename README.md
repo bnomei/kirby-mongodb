@@ -136,7 +136,6 @@ foreach ($films as $film) {
     }
     echo implode(', ', $actors);
 }
-?>
 ```
 
 #### Query the cache instead to get the same information in under 100ms
