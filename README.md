@@ -270,16 +270,16 @@ return [
 
 ## Settings
 
-| bnomei.mongodb.          | Default     | Description                                                                  |            
-|--------------------------|-------------|------------------------------------------------------------------------------|
-| host                     | `127.0.0.1` |                                                                              |
-| port                     | `27017`     |                                                                              |
-| username                 | `null`      |                                                                              |
-| password                 | `null`      |                                                                              |
-| database                 | `kirby`     | you can give it any name you want and MongoDB will create it for you         |
-| khulan.read              | `false`     | read from cache is disabled by default as loading from file might be faster  |
-| khulan.write             | `true`      | write to cache for all models that use the ModelWithKhulan trait             |
-| khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching it content |
+| bnomei.mongodb.          | Default     | Description                                                                   |            
+|--------------------------|-------------|-------------------------------------------------------------------------------|
+| host                     | `127.0.0.1` |                                                                               |
+| port                     | `27017`     |                                                                               |
+| username                 | `null`      |                                                                               |
+| password                 | `null`      |                                                                               |
+| database                 | `kirby`     | you can give it any name you want and MongoDB will create it for you          |
+| khulan.read              | `false`     | read from cache is disabled by default as loading from file might be faster   |
+| khulan.write             | `true`      | write to cache for all models that use the ModelWithKhulan trait              |
+| khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching its content |
 
 ## Disclaimer
 
