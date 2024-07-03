@@ -16,7 +16,7 @@ use function option;
 
 final class Mongodb extends Cache
 {
-    protected Client $_client;
+    protected ?Client $_client = null;
 
     /**
      * Sets all parameters which are needed to connect to MongoDB.
@@ -44,20 +44,7 @@ final class Mongodb extends Cache
 
         parent::__construct($this->options);
 
-        if (! empty($this->options['username']) && ! empty($this->options['password'])) {
-            $auth = $this->options['username'].':'.$this->options['password'].'@';
-        } else {
-            $auth = '';
-        }
-
-        $this->_client = new Client(
-            'mongodb://'.$auth.$this->options['host'].':'.$this->options['port']
-        );
-        $this->_client->selectDatabase($this->options['database']);
-
-        if ($this->option('debug')) {
-            $this->flush();
-        }
+        // client init is done lazily see ->client()
     }
 
     /**
@@ -201,12 +188,29 @@ final class Mongodb extends Cache
 
     public function client(): Client
     {
+        if (! $this->_client) {
+            if (! empty($this->options['username']) && ! empty($this->options['password'])) {
+                $auth = $this->options['username'].':'.$this->options['password'].'@';
+            } else {
+                $auth = '';
+            }
+
+            $this->_client = new Client(
+                'mongodb://'.$auth.$this->options['host'].':'.$this->options['port']
+            );
+            $this->_client->selectDatabase($this->options['database']);
+
+            if ($this->option('debug')) {
+                $this->flush();
+            }
+        }
+
         return $this->_client;
     }
 
     public function collection(string $collection): Collection
     {
-        return $this->_client->selectCollection($this->options['database'], $collection);
+        return $this->client()->selectCollection($this->options['database'], $collection);
     }
 
     public function cacheCollection(): Collection

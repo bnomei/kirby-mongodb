@@ -115,6 +115,77 @@ $pages = khulan([
 ]);
 ```
 
+### Example: Filtering and Resolving Relations
+
+With Kirby's content cache as a NoSQL database you can do some advanced filtering. If you would do the same with Kirby's
+filtering on collection you would end up loading a lot pages and that is not as efficient. We can load the information
+we need directly from the cache without the need to load the full page object.
+
+Let's assume we have two models: `film` and `actor`. The `film` model has a field `actors` which is a pages field with
+linked `actor` pages. We want to list all films with their actors.
+
+#### Load 1000 films and their actors, total of 6429 pages accessed in 250ms
+
+```php
+$films = page('films')->children();
+foreach ($films as $film) {
+    echo $film->title();
+    $actors = [];
+    foreach ($film->actors()->toPages() as $actor) {
+        $actors[] = $actor->title();
+    }
+    echo implode(', ', $actors);
+}
+?>
+```
+
+#### Query the cache instead to get the same information in under 100ms
+
+```php
+/** @var \MongoDB\Driver\Cursor $films */
+$films = khulan()->aggregate([
+    [
+        // only get pages with template 'film'
+        '$match' => ['template' => 'film'],
+    ],
+    [
+        // lookup actors by their mongodb objectId
+        // this will create an array of objects
+        '$lookup' => [
+            'from' => 'kirby',
+            'localField' => 'actors{}',
+            'foreignField' => '_id',
+            'as' => 'actor_details',
+        ],
+    ],
+    [
+        // only get the fields we need
+        // to make the query even faster
+        '$project' => [
+            'title' => 1,
+            'id' => 1,
+            'actor_details.title' => 1,
+        ],
+    ],
+]);
+
+/** @var \MongoDB\BSON\Document $film */
+foreach ($films as $film) { ?>
+<div>
+    <a href="<?= url($film->id) ?>"><?= html($film->title) ?></a>
+    <ul>
+        <?php foreach ($film->actor_details as $actor) { ?>
+            <li><?= html($actor->title) ?></li>
+        <?php } ?>
+    </ul>
+</div>
+<?php }
+```
+
+> [!NOTE]
+>
+> This example is from [my Sakila DB kit](https://github.com/bnomei/kirby-sakila-kit/tree/with-mongodb-plugin).
+
 ## MongoDB Client
 
 You can access the underlying MongoDB client directly.
@@ -206,9 +277,9 @@ return [
 | port                     | `27017`     |                                                                              |
 | username                 | `null`      |                                                                              |
 | password                 | `null`      |                                                                              |
-| database                 | `kirby`     |                                                                              |
-| khulan.read              | `true`      | read from cache                                                              |
-| khulan.write             | `true`      | write to cache                                                               |
+| database                 | `kirby`     | you can give it any name you want and MongoDB will create it for you         |
+| khulan.read              | `false`     | read from cache is disabled by default as loading from file might be faster  |
+| khulan.write             | `true`      | write to cache for all models that use the ModelWithKhulan trait             |
 | khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching it content |
 
 ## Disclaimer

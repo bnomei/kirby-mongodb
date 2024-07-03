@@ -69,7 +69,7 @@ Kirby::plugin('bnomei/mongodb', [
 
         // khulan
         'khulan' => [ // cache for models
-            'read' => true,
+            'read' => false, // mongodb is most likely slower than file system for the pages
             'write' => true,
             'patch-files-class' => true, // monkey patch files class
         ],
@@ -79,8 +79,8 @@ Kirby::plugin('bnomei/mongodb', [
     ],
     'hooks' => [
         'system.loadPlugins:after' => function () {
-            if (option('bnomei.mongodb.khulan.read') &&
-                option('bnomei.mongodb.khulan.write') &&
+            if ((option('bnomei.mongodb.khulan.read') ||
+                option('bnomei.mongodb.khulan.write') ) &&
                 khulan()->countDocuments() === 0) {
                 Khulan::index();
             }
