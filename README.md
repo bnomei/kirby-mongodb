@@ -121,6 +121,12 @@ With Kirby's content cache as a NoSQL database you can do some advanced filterin
 filtering on collection you would end up loading a lot pages and that is not as efficient. We can load the information
 we need directly from the cache without the need to load the full page object.
 
+Why would we bother to read the content from a NoSQL based cache and not just put a cache around the native Kirby logic?
+Because the hard thing with caches is to know when to invalidate them. With the content cache we can query the NoSQL
+based cache directly and updating any model will be reflected instantly. Whereas with a cache around the native Kirby
+logic we would need rebuild the cache on every change (like with
+the [pages cache](https://getkirby.com/docs/guide/cache#caching-pages)).
+
 Let's assume we have two models: `film` and `actor`. The `film` model has a field `actors` which is a pages field with
 linked `actor` pages. We want to list all films with their actors.
 
