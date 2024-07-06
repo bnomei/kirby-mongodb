@@ -41,6 +41,7 @@ if (! function_exists('khulan')) {
                     ['_id' => $search],
                     ['id' => $search],
                     ['uuid' => $search],
+                    ['email' => $search], // user
                 ],
             ]));
         }
@@ -80,7 +81,7 @@ Kirby::plugin('bnomei/mongodb', [
     'hooks' => [
         'system.loadPlugins:after' => function () {
             if ((option('bnomei.mongodb.khulan.read') ||
-                option('bnomei.mongodb.khulan.write') ) &&
+                option('bnomei.mongodb.khulan.write')) &&
                 khulan()->countDocuments() === 0) {
                 Khulan::index();
             }

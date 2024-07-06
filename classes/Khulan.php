@@ -38,7 +38,24 @@ class Khulan
             }
             $count++;
         }
-        // TODO: files, users
+
+        /** @var File $file */
+        foreach (kirby()->users() as $user) {
+            if ($user->hasKhulan() !== true) {
+                continue;
+            }
+            if (kirby()->multilang()) {
+                foreach (kirby()->languages() as $language) {
+                    $content = $user->content($language->code())->toArray();
+                    $hash[] = $user->email();
+                    $user->writeKhulan($content, $language->code());
+                }
+            } else {
+                $hash[] = $user->email();
+                $user->writeKhulan($user->content()->toArray());
+            }
+            $count++;
+        }
 
         $meta = [
             'count' => $count,

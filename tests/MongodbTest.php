@@ -3,6 +3,8 @@
 use Bnomei\Khulan;
 use Bnomei\Mongodb;
 use Kirby\Cms\Page;
+use Kirby\Cms\User;
+use Kirby\Cms\Users;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Collection;
 use MongoDB\Model\BSONDocument;
@@ -167,6 +169,20 @@ it('find all products in the category books or movies that had been modified wit
     ]);
 
     expect($pages->count())->toBe(1);
+});
+
+it('can find a user by email', function () {
+    Khulan::index();
+
+    $email = kirby()->users()->first()->email();
+
+    $users = khulan(['email' => $email]);
+    expect($users)->toBeInstanceOf(Users::class)
+        ->and($users->first()->email())->toBe($email);
+
+    $user = khulan($email);
+    expect($user)->toBeInstanceOf(User::class)
+        ->and($user->email())->toBe($email);
 });
 
 it('can run the benchmark', function () {

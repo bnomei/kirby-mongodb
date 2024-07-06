@@ -9,6 +9,9 @@ sections:
         type: text
         translate: false
         width: 1/2
+      date:
+        type: date
+        time: true
       tags:
         type: tags
       category:

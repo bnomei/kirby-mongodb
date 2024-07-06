@@ -10,9 +10,8 @@ class AdminUser extends \Kirby\Cms\User
     }
 }
 
-// TODO
-//Kirby::plugin('myplugin/user', [
-//    'userModels' => [
-//        'admin' => AdminUser::class, // admin is default role
-//    ],
-//]);
+Kirby::plugin('myplugin/user', [
+    'userModels' => [
+        'admin' => AdminUser::class, // admin is default role
+    ],
+]);

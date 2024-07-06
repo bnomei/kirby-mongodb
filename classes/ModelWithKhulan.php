@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Bnomei;
 
+use DateTime;
+use Exception;
 use Kirby\Cms\File;
+use Kirby\Cms\Page;
 use Kirby\Cms\Site;
 use Kirby\Cms\User;
 use Kirby\Data\Yaml;
 use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
 
 trait ModelWithKhulan
 {
@@ -35,7 +40,8 @@ trait ModelWithKhulan
             $key = $key.'-'.$languageCode;
         }
 
-        return hash('xxh3', $key);
+        // mongodb _id must be 24 chars long
+        return substr(hash('md5', $key), 0, 24);
     }
 
     public function readContentCache(?string $languageCode = null): ?array
@@ -73,7 +79,17 @@ trait ModelWithKhulan
             return true;
         }
 
-        $modified = $this->modified();
+        $modified = null;
+        if ($this instanceof Site) {
+            // site()->modified() does crawl index but not return change of its content file
+            $siteFile = site()->storage()->read(
+                site()->storage()->defaultVersion(),
+                kirby()->defaultLanguage()->code()
+            )[0];
+            $modified = $modified.filemtime($siteFile);
+        } else {
+            $modified = $this->modified();
+        }
 
         // in rare case file does not exists or is not readable
         if ($modified === false) {
@@ -95,12 +111,19 @@ trait ModelWithKhulan
         $meta = [
             'id' => $this->id() ?? null,
             'modified' => $modified,
+            'modified{}' => new UTCDateTime($modified * 1000),
             'slug' => $this->id() ? array_pop($slug) : null,
-            'template' => $this->intendedTemplate()->name(),
             'class' => $this::class,
             'language' => $languageCode,
             'modelType' => $modelType,
         ];
+        if ($this instanceof Page) {
+            $meta['template'] = $this->intendedTemplate()->name();
+        } elseif ($this instanceof File) {
+            $meta['filename'] = $this->filename();
+        } elseif ($this instanceof User) {
+            $meta['email'] = $this->email();
+        }
         $data = $this->encodeKhulan($data, $languageCode) + $meta;
 
         // _id is not allowed as data key
@@ -109,7 +132,7 @@ trait ModelWithKhulan
         }
 
         $status = khulan()->findOneAndUpdate(
-            ['_id' => $this->keyKhulan($languageCode)],
+            ['_id' => new ObjectId($this->keyKhulan($languageCode))],
             ['$set' => $data],
             ['upsert' => true]
         );
@@ -168,9 +191,21 @@ trait ModelWithKhulan
                 if (preg_match('/^[\w\s-]+(,\s*[\w\s-]+)*$/', $value) && in_array(
                     $type, ['tags', 'select', 'multiselect', 'radio', 'checkbox']
                 )) {
-                    $copy[$key.'[,]'] = explode(',', $value);
+                    $tags = explode(',', $value);
+                    $tags = array_map('trim', $tags);
+                    $tags = array_filter($tags, function ($value) {
+                        return ! empty($value);
+                    });
+                    $copy[$key.'[,]'] = $tags;
 
                     continue; // process next key value pair
+                }
+
+                if (in_array(
+                    $type, ['date']
+                )) {
+                    // convert iso date to mongodb date
+                    $copy[$key.'{}'] = new UTCDateTime((new DateTime($value))->getTimestamp() * 1000);
                 }
 
                 // if it is a valid yaml string, convert it to an array
@@ -218,8 +253,9 @@ trait ModelWithKhulan
                                 }
                             }
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         // do nothing
+                        // ray($e->getMessage());
                     }
                 }
                 // if it is a valid yaml string, convert it to an array
@@ -231,7 +267,7 @@ trait ModelWithKhulan
                         if (is_array($v)) {
                             $copy[$key.'[]'] = $v;
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         // do nothing
                     }
                 }
@@ -253,13 +289,13 @@ trait ModelWithKhulan
         $data = json_decode(json_encode($data), true);
 
         $copy = $data;
-        foreach ($data as $key => $value) {
-            if (is_array($value) && Str::endsWith($key, '[,]')) {
-                unset($copy[$key]);
-            } elseif (is_array($value) && Str::endsWith($key, '[]')) {
-                unset($copy[$key]);
-            }
-        }
+
+        // remove any empty values
+        $copy = array_filter($copy, function ($value) {
+            return ! empty($value);
+        });
+
+        // remove meta
         $meta = [
             'id',
             'modified',
@@ -268,6 +304,8 @@ trait ModelWithKhulan
             'class',
             'language',
             'modelType',
+            'filename',
+            'email',
         ];
         foreach ($meta as $key) {
             if (array_key_exists($key, $copy)) {
@@ -275,10 +313,17 @@ trait ModelWithKhulan
             }
         }
 
-        // remove any empty values
-        $copy = array_filter($copy, function ($value) {
-            return ! empty($value);
-        });
+        // remove dynamic keys
+        foreach ($data as $key => $value) {
+            if (is_array($value) && (
+                Str::endsWith($key, '[,]') ||
+                Str::endsWith($key, '[]') ||
+                Str::endsWith($key, '{}')
+            )
+            ) {
+                unset($copy[$key]);
+            }
+        }
 
         return $copy;
     }
