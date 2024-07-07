@@ -138,7 +138,7 @@ it('can find all pages that have a certain tags', function () {
         'tags[,]' => ['$in' => ['Punk']],
     ]);
 
-    expect($pages->count())->toBe(1);
+    expect($pages->count())->toBe(2);
 });
 
 it('can find all pages that have another page linked', function () {
@@ -183,6 +183,14 @@ it('can find a user by email', function () {
     $user = khulan($email);
     expect($user)->toBeInstanceOf(User::class)
         ->and($user->email())->toBe($email);
+});
+
+it('can find a file', function () {
+    Khulan::index();
+
+    $file = khulan('betterharder/image.jpg');
+    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+        ->and($file->filename())->toBe('image.jpg');
 });
 
 it('can run the benchmark', function () {

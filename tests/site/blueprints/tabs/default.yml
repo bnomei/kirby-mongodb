@@ -22,7 +22,14 @@ sections:
           movies: Movies
       related:
         type: pages
+      grass:
+        type: files
+        uploads:
+          template: grass
+        info: "{{ file.template }}"
   pages:
     type: pages
+    info: "{{ page.template }}"
   files:
     type: files
+    info: "{{ file.template }}"

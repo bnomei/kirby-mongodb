@@ -72,7 +72,7 @@ Kirby::plugin('bnomei/mongodb', [
         'khulan' => [ // cache for models
             'read' => false, // mongodb is most likely slower than file system for the pages
             'write' => true,
-            'patch-files-class' => false, // monkey patch files class
+            'patch-files-class' => true, // monkey patch files class
         ],
     ],
     'cacheTypes' => [

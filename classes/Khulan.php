@@ -10,6 +10,8 @@ use Kirby\Cms\Pages;
 use Kirby\Cms\Site;
 use Kirby\Cms\User;
 use Kirby\Cms\Users;
+use Kirby\Data\Data;
+use Kirby\Filesystem\F;
 use Kirby\Toolkit\A;
 
 class Khulan
@@ -39,7 +41,7 @@ class Khulan
             $count++;
         }
 
-        /** @var File $file */
+        /** @var User $user */
         foreach (kirby()->users() as $user) {
             if ($user->hasKhulan() !== true) {
                 continue;
@@ -53,6 +55,28 @@ class Khulan
             } else {
                 $hash[] = $user->email();
                 $user->writeKhulan($user->content()->toArray());
+            }
+            $count++;
+        }
+
+        /** @var File $file */
+        foreach (site()->index(true)->files() as $file) {
+            if ($file->hasKhulan() !== true) {
+                continue;
+            }
+            if (kirby()->multilang()) {
+                foreach (kirby()->languages() as $language) {
+                    $contentFile = $file->root().'.'.$language->code().'.txt';
+                    if (! F::exists($contentFile)) {
+                        continue;
+                    }
+                    $hash[] = $file->id().$language->code();
+                    $file->writeKhulan(Data::read($contentFile), $language->code());
+                }
+            } else {
+                $contentFile = $file->root().'.txt';
+                $hash[] = $file->id();
+                $file->writeKhulan(Data::read($contentFile));
             }
             $count++;
         }
@@ -75,6 +99,7 @@ class Khulan
             khulan()->createIndex(['language' => 1]);
             khulan()->createIndex(['template' => 1]);
             khulan()->createIndex(['modelType' => 1]);
+            khulan()->createIndex(['status' => 1]);
         }
 
         return $meta;

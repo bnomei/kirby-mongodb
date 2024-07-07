@@ -6,11 +6,13 @@ namespace Bnomei;
 
 use DateTime;
 use Exception;
+use Kirby\Cms\Blueprint;
 use Kirby\Cms\File;
 use Kirby\Cms\Page;
 use Kirby\Cms\Site;
 use Kirby\Cms\User;
 use Kirby\Data\Yaml;
+use Kirby\Filesystem\F;
 use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
 use MongoDB\BSON\ObjectId;
@@ -22,6 +24,10 @@ trait ModelWithKhulan
 
     public function hasKhulan(): bool
     {
+        if ($this instanceof File) {
+            return $this->parent()->hasKhulan() === true;
+        }
+
         return true;
     }
 
@@ -107,24 +113,33 @@ trait ModelWithKhulan
             $modelType = 'file';
         }
 
-        $slug = explode('/', $this->id());
         $meta = [
             'id' => $this->id() ?? null,
             'modified' => $modified,
             'modified{}' => new UTCDateTime($modified * 1000),
-            'slug' => $this->id() ? array_pop($slug) : null,
             'class' => $this::class,
             'language' => $languageCode,
             'modelType' => $modelType,
         ];
         if ($this instanceof Page) {
+            $slug = explode('/', $this->id());
+            $meta['num'] = $this->num() ? (int) $this->num() : null;
+            $meta['slug'] = $this->id() ? array_pop($slug) : null;
             $meta['template'] = $this->intendedTemplate()->name();
+            $meta['status'] = $this->status();
         } elseif ($this instanceof File) {
+            // can not use $file->content() since it would trigger a loop
+            $meta['sort'] = A::get($data, 'sort') ? (int) A::get($data, 'sort') : null;
             $meta['filename'] = $this->filename();
+            $meta['template'] = A::get($data, 'template');
+            $meta['mimeType'] = F::mime($this->root());
+            $meta['parent{}'] = new ObjectId($this->parent()->keyKhulan($languageCode));
         } elseif ($this instanceof User) {
             $meta['email'] = $this->email();
+            $meta['name'] = $this->name()->isNotEmpty() ? $this->name()->value() : null;
+            $meta['role'] = $this->role()->name();
         }
-        $data = $this->encodeKhulan($data, $languageCode) + $meta;
+        $data = array_merge($this->encodeKhulan($data, $languageCode), $meta);
 
         // _id is not allowed as data key
         if (array_key_exists('_id', $data)) {
@@ -180,11 +195,28 @@ trait ModelWithKhulan
 
     public function encodeKhulan(array $data, ?string $languageCode = null): array
     {
+        $blueprint = null;
+        if ($this instanceof Page) {
+            $blueprint = $this->blueprint()->fields();
+        } elseif ($this instanceof File) {
+            // $blueprint = $this->blueprint();
+            // does not work as that would trigger a loop reading the content
+            // but it can be read manually
+            $blueprint = Blueprint::find('files/'.A::get($data, 'template', 'default'));
+            $blueprint = A::get($blueprint, 'fields');
+        }
+        if (! $blueprint) {
+            return $data;
+        }
         // foreach each key value pairs
         $copy = $data;
         foreach ($data as $key => $value) {
+            $field = A::get($blueprint, $key);
+            if (! $field) {
+                continue;
+            }
             if (is_string($value)) {
-                $type = A::get($this->blueprint()->field($key), 'type');
+                $type = A::get($field, 'type');
 
                 // if it is a comma separated list unroll it to an array. validate if it is with a regex but allow for spaces chars after the comma
 
@@ -299,14 +331,26 @@ trait ModelWithKhulan
         $meta = [
             'id',
             'modified',
-            'slug',
-            'template',
+            'modified{}',
             'class',
             'language',
             'modelType',
-            'filename',
-            'email',
         ];
+        if ($this instanceof Page) {
+            $meta[] = 'num';
+            $meta[] = 'slug';
+            $meta[] = 'status';
+            $meta[] = 'template';
+        } elseif ($this instanceof File) {
+            $meta[] = 'sort';
+            $meta[] = 'filename';
+            $meta[] = 'mimeType';
+            $meta[] = 'template';
+        } elseif ($this instanceof User) {
+            $meta[] = 'email';
+            $meta[] = 'name';
+            $meta[] = 'role';
+        }
         foreach ($meta as $key) {
             if (array_key_exists($key, $copy)) {
                 unset($copy[$key]);

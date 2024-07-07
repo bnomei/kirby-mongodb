@@ -1,0 +1,3 @@
+fields:
+  birthday:
+    type: date
