@@ -83,10 +83,13 @@ $page = khulan(['uuid' => 'page://betterharder']);
 
 // find all pages with a template
 $pages = khulan(['template' => 'post']);
-```
 
-> [!WARNING]
-> The khulan()-helper is currently only tested for Pages. Files and Users might work or not.
+// find a user by email or Id
+$user = khulan($emailOrId);
+
+// find a file by filename and template
+$file = khulan(['filename' => 'my-image.jpg', 'template' => 'image']);
+```
 
 ### Special Fields with [], {} and [,]
 
@@ -189,7 +192,8 @@ foreach ($films as $film) { ?>
 
 > [!NOTE]
 >
-> This example is from [my Sakila DB kit](https://github.com/bnomei/kirby-sakila-kit/tree/with-mongodb-plugin).
+> This example is from [my Sakila DB kit](https://github.com/bnomei/kirby-sakila-kit/tree/with-mongodb-plugin). You can
+> use similar queries to filter and resolve relations of files and user objects.
 
 ## MongoDB Client
 
