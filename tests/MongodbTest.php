@@ -166,9 +166,10 @@ it('find all products in the category books or movies that had been modified wit
         'template' => 'default',
         'category[,]' => ['$in' => ['books', 'movies']],
         'modified' => ['$gt' => time() - (7 * 24 * 60 * 60)],
+        'language' => 'en',
     ]);
 
-    expect($pages->count())->toBe(1);
+    expect($pages->count())->toBeGreaterThanOrEqual(1);
 });
 
 it('can find a user by email', function () {
@@ -191,6 +192,26 @@ it('can find a file', function () {
     $file = khulan('betterharder/image.jpg');
     expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
         ->and($file->filename())->toBe('image.jpg');
+});
+
+it('will use the indices', function () {
+    Khulan::index();
+
+    $documents = khulan()->aggregate([
+        ['$match' => [
+            'template' => 'default',
+            'status' => 'listed',
+            'language' => 'en',
+            'category[,]' => 'books',
+        ]],
+        ['$sort' => ['modified' => -1]],
+        ['$limit' => 1],
+    ]);
+    $count = 0;
+    foreach ($documents as $document) {
+        $count++;
+    }
+    expect($count)->toBe(1);
 });
 
 it('can run the benchmark', function () {

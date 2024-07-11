@@ -19,10 +19,8 @@ class Khulan
     public static function index(int $iterations = 2): array
     {
         $count = 0;
-        $hash = [];
+        $time = microtime(true);
 
-        // reading a field like the title will make sure
-        // that the page is loaded and cached
         /** @var Page $page */
         foreach (site()->index(true) as $page) {
             if ($page->hasKhulan() !== true) {
@@ -31,11 +29,9 @@ class Khulan
             if (kirby()->multilang()) {
                 foreach (kirby()->languages() as $language) {
                     $content = $page->content($language->code())->toArray();
-                    $hash[] = $content['title'];
                     $page->writeKhulan($content, $language->code());
                 }
             } else {
-                $hash[] = $page->title()->value();
                 $page->writeKhulan($page->content()->toArray());
             }
             $count++;
@@ -49,11 +45,9 @@ class Khulan
             if (kirby()->multilang()) {
                 foreach (kirby()->languages() as $language) {
                     $content = $user->content($language->code())->toArray();
-                    $hash[] = $user->email();
                     $user->writeKhulan($content, $language->code());
                 }
             } else {
-                $hash[] = $user->email();
                 $user->writeKhulan($user->content()->toArray());
             }
             $count++;
@@ -70,12 +64,10 @@ class Khulan
                     if (! F::exists($contentFile)) {
                         continue;
                     }
-                    $hash[] = $file->id().$language->code();
                     $file->writeKhulan(Data::read($contentFile), $language->code());
                 }
             } else {
                 $contentFile = $file->root().'.txt';
-                $hash[] = $file->id();
                 $file->writeKhulan(Data::read($contentFile));
             }
             $count++;
@@ -83,7 +75,7 @@ class Khulan
 
         $meta = [
             'count' => $count,
-            'hash' => hash('xxh3', implode('|', $hash)),
+            'time' => microtime(true) - $time,
         ];
 
         // call twice by default to make it possible to resolve relations
@@ -93,13 +85,29 @@ class Khulan
         }
 
         // add indexes for better performance
+        // https://learn.mongodb.com/learn/course/mongodb-indexes/lesson-4-working-with-compound-indexes-in-mongodb/learn
+        // equality, sort, range + likely selected fields to avoid full collection scans
         if ($iterations === 1) {
-            khulan()->createIndex(['id' => 1]);
-            khulan()->createIndex(['uuid' => 1]);
-            khulan()->createIndex(['language' => 1]);
-            khulan()->createIndex(['template' => 1]);
-            khulan()->createIndex(['modelType' => 1]);
-            khulan()->createIndex(['status' => 1]);
+            $indexes = [
+                // by id
+                ['id' => 1, 'template' => 1, 'status' => 1, 'num' => 1, 'slug' => 1, 'modified' => 1, 'title' => 1, 'uuid' => 1],
+                ['id' => 1, 'template' => 1, 'sort' => 1, 'modified' => 1, 'filename' => 1,  'parent{}' => 1, 'uuid' => 1],
+                // by uuid
+                ['uuid' => 1, 'template' => 1, 'status' => 1, 'num' => 1, 'slug' => 1, 'modified' => 1, 'title' => 1, 'id' => 1],
+                ['uuid' => 1, 'template' => 1, 'sort' => 1, 'modified' => 1, 'filename' => 1,  'parent{}' => 1, 'id' => 1],
+                // by template and status
+                ['template' => 1, 'status' => 1, 'num' => 1, 'slug' => 1, 'modified' => 1, 'title' => 1, 'id' => 1, 'uuid' => 1],
+                ['template' => 1, 'sort' => 1, 'modified' => 1, 'filename' => 1, 'id' => 1, 'uuid' => 1, 'parent{}' => 1],
+                // by email
+                ['email' => 1, 'role' => 1, 'name' => 1, 'modified' => 1, 'id' => 1, 'uuid' => 1],
+            ];
+            $isMultilang = kirby()->multilang();
+            foreach ($indexes as $index) {
+                if ($isMultilang) {
+                    $index['language'] = 1;
+                }
+                khulan()->createIndex($index, ['unique' => true]);
+            }
         }
 
         return $meta;
