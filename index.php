@@ -78,6 +78,26 @@ Kirby::plugin('bnomei/mongodb', [
     'cacheTypes' => [
         'mongodb' => \Bnomei\Mongodb::class,
     ],
+    'commands' => [
+        'khulan:index' => [
+            'description' => 'Force indexing all pages/files/users',
+            'args' => [],
+            'command' => static function (\Kirby\CLI\CLI $cli): void {
+                $meta = Khulan::index(1);
+                $count = $meta['count'];
+                $time = round($meta['time'] * 1000);
+
+                $cli->success('Indexed '.$count.' in '.$time.'ms.');
+
+                if (function_exists('janitor')) {
+                    janitor()->data($cli->arg('command'), [
+                        'status' => 200,
+                        'message' => 'Indexed '.$count.' in '.$time.'ms.',
+                    ]);
+                }
+            },
+        ],
+    ],
     'hooks' => [
         'system.loadPlugins:after' => function () {
             if ((option('bnomei.mongodb.khulan.read') ||
