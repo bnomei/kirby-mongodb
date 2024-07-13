@@ -30,13 +30,15 @@ final class Mongodb extends Cache
             'database' => option('bnomei.mongodb.database'),
             'username' => option('bnomei.mongodb.username'),
             'password' => option('bnomei.mongodb.password'),
+            'uriOptions' => option('bnomei.mongodb.uriOptions'),
+            'driverOptions' => option('bnomei.mongodb.driverOptions'),
             'collection-cache' => option('bnomei.mongodb.collections.cache'),
             'collection-content' => option('bnomei.mongodb.collections.content'),
         ], $options);
 
         foreach ($this->options as $key => $call) {
             if (! is_string($call) && is_callable($call) && in_array($key, [
-                'host', 'port', 'database', 'username', 'password',
+                'host', 'port', 'database', 'username', 'password', 'uriOptions', 'driverOptions',
             ])) {
                 $this->options[$key] = $call();
             }
@@ -196,7 +198,9 @@ final class Mongodb extends Cache
             }
 
             $this->_client = new Client(
-                'mongodb://'.$auth.$this->options['host'].':'.$this->options['port']
+                'mongodb://'.$auth.$this->options['host'].':'.$this->options['port'],
+                $this->options['uriOptions'] ?? [],
+                $this->options['driverOptions'] ?? [],
             );
             $this->_client->selectDatabase($this->options['database']);
 

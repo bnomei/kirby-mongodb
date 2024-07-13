@@ -28,12 +28,21 @@ if (! function_exists('mongo')) {
 
 if (! function_exists('khulan')) {
 
-    function khulan(string|array|null $search = null): mixed
+    function khulan(string|array|null $search = null, ?array $options = null): mixed
     {
         $collection = \Bnomei\Mongodb::singleton()->contentCollection();
 
+        // only get these fields as it is faster and enough for kirby
+        $options ??= [
+            'projection' => [
+                'id' => 1,
+                'uuid' => 1,
+                'modelType' => 1,
+            ],
+        ];
+
         if (is_array($search)) {
-            return Khulan::documentsToModels($collection->find($search));
+            return Khulan::documentsToModels($collection->find($search, $options));
 
         } elseif (is_string($search)) {
             return Khulan::documentToModel($collection->findOne([
@@ -43,7 +52,7 @@ if (! function_exists('khulan')) {
                     ['uuid' => $search],
                     ['email' => $search], // user
                 ],
-            ]));
+            ], $options));
         }
 
         return $collection;
@@ -61,6 +70,8 @@ Kirby::plugin('bnomei/mongodb', [
         'database' => 'kirby',
         'username' => null,
         'password' => null,
+        'uriOptions' => [],
+        'driverOptions' => [],
 
         // collections
         'collections' => [

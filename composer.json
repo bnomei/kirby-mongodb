@@ -1,7 +1,7 @@
 {
     "name": "bnomei/kirby-mongodb",
     "type": "kirby-plugin",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "description": "Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB",
     "license": "MIT",
     "authors": [

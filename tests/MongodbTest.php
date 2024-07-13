@@ -214,6 +214,22 @@ it('will use the indices', function () {
     expect($count)->toBe(1);
 });
 
+it('can use options on the khulan-find to limit selected fields', function () {
+    Khulan::index();
+
+    // these are the default options for khulan
+    // and optimized for speed
+    $page = khulan('betterharder', [
+        'projection' => [
+            'id' => 1,
+            'uuid' => 1,
+            'modelType' => 1,
+        ],
+    ]);
+
+    expect($page)->not()->toBeNull();
+});
+
 it('can run the benchmark', function () {
     mongo()->benchmark();
 })->skip();
