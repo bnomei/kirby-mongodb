@@ -70,6 +70,36 @@ it('can use the cache', function () {
     expect($value)->toBe('value');
 });
 
+it('can use the cache for array based values', function () {
+    $mongodb = mongo();
+    $mongodb->set('tagging', [
+        'tags' => ['tag1', 'tag2'],
+        'not_value' => 'notmyvalue',
+    ]);
+
+    $collection = mongo()->cacheCollection();
+    $documents = $collection->find([
+        'value.tags' => ['$in' => ['tag1']],
+    ]);
+
+    foreach ($documents as $document) {
+        expect($document->value->tags[0])->toEqual('tag1')
+            ->and($document->value->tags[1])->toEqual('tag2')
+            ->and($document->value->not_value)->toEqual('notmyvalue');
+    }
+});
+
+it('can clean expired entries', function () {
+    $mongodb = mongo();
+    $mongodb->set('test', 'value', 5);
+
+    $mongodb->clean(time() + 5 * 60 + 1);
+
+    $value = $mongodb->get('test');
+
+    expect($value)->toBeNull();
+});
+
 it('will not use the cache in debug mode', function () {
     Mongodb::$singleton = null;
 

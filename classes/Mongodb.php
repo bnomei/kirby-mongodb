@@ -18,6 +18,8 @@ final class Mongodb extends Cache
 {
     protected ?Client $_client = null;
 
+    protected bool $hasCleanedOnce = false;
+
     /**
      * Sets all parameters which are needed to connect to MongoDB.
      */
@@ -34,6 +36,7 @@ final class Mongodb extends Cache
             'driverOptions' => option('bnomei.mongodb.driverOptions'),
             'collection-cache' => option('bnomei.mongodb.collections.cache'),
             'collection-content' => option('bnomei.mongodb.collections.content'),
+            'auto-clean-cache' => option('bnomei.mongodb.auto-clean-cache'),
         ], $options);
 
         foreach ($this->options as $key => $call) {
@@ -95,6 +98,11 @@ final class Mongodb extends Cache
      */
     public function retrieve(string $key): ?Value
     {
+        if ($this->options['auto-clean-cache'] && $this->hasCleanedOnce === false) {
+            $this->clean(time());
+            $this->hasCleanedOnce = true;
+        }
+
         $value = $value ?? $this->cacheCollection()->findOne([
             '_id' => $this->key($key),
         ]);
@@ -181,6 +189,15 @@ final class Mongodb extends Cache
     public function root(): string
     {
         return kirby()->cache('bnomei.mongodb')->root();
+    }
+
+    public function clean(?int $time = null): ?int
+    {
+        $result = $this->cacheCollection()->deleteMany([
+            'expires_at' => ['$lt' => $time ?? time()],
+        ]);
+
+        return $result->isAcknowledged() ? $result->getDeletedCount() : null;
     }
 
     public function cache(): self

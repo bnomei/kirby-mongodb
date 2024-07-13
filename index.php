@@ -72,6 +72,7 @@ Kirby::plugin('bnomei/mongodb', [
         'password' => null,
         'uriOptions' => [],
         'driverOptions' => [],
+        'auto-clean-cache' => true,
 
         // collections
         'collections' => [

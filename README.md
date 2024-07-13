@@ -222,7 +222,7 @@ $value = $cache->get('mykey');
 
 $cache->set('tagging', [
     'tags' => ['tag1', 'tag2'],
-    'value' => 'myvalue',
+    'other_value' => 'myothervalue',
 ]);
 ```
 
@@ -245,17 +245,30 @@ filtering my tags or invalidating many cache entries at once.
 // NOTE: we are using the cacheCollection() method here
 $collection = mongo()->cacheCollection();
 
-// find all that have the tag 'tag1'
+// find all that have the tag 'tag1' and are NOT expired
 $documents = $collection->find([
-    'tags' => ['$in' => ['tag1']],
+    'value.tags' => ['$in' => ['tag1']],
+    'expires_at' => ['$gt' => time()],
 ]);
+foreach ($documents as $document) {
+    // $document->value->tags
+    // $document->value->other_value
+}
 
 // delete any cache entry older than 5 minutes
 $deleteResult = $collection->deleteMany([
     'expires_at' => ['$lt' => time() - 5*60]
 ]);
 $deletedCount = $deleteResult->getDeletedCount();
+
+// you can also manually clean expired cache entries
+mongo()->clean();
 ```
+
+> [!NOTE]
+>
+> Querying the cache directly is not recommended for regular use-cases. It will not check for the expiration of the
+> cache entries and delete them automatically.
 
 ## Using the Cache Driver in Kirby
 
@@ -287,6 +300,9 @@ return [
 | username                 | `null`      |                                                                               |
 | password                 | `null`      |                                                                               |
 | database                 | `kirby`     | you can give it any name you want and MongoDB will create it for you          |
+| uriOptions               | `[]`        |                                                                               |
+| driverOptions            | `[]`        |                                                                               |
+| auto-clean-cache         | `true`      | will clean the cache once before the first get()                              |
 | khulan.read              | `false`     | read from cache is disabled by default as loading from file might be faster   |
 | khulan.write             | `true`      | write to cache for all models that use the ModelWithKhulan trait              |
 | khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching its content |
