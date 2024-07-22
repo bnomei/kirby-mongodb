@@ -210,9 +210,24 @@ it('find all products in the category books or movies that had been modified wit
 });
 
 it('can find a user by email', function () {
+
+    kirby()->impersonate('kirby');
+
+    if ($user = kirby()->users()->find('test@bnomei.com') ?? null) {
+        $user->delete(); // cleanup
+    }
+
     Khulan::index();
 
-    $email = kirby()->users()->first()->email();
+    /** @var \Bnomei\KhulanUser $user */
+    $user = kirby()->users()->create([
+        'email' => 'test@bnomei.com',
+        'role' => 'admin',
+        'model' => 'admin',
+    ]);
+    // NOTE: both role and model are needed
+    // for the user to be indexed
+    $email = $user->email();
 
     $users = khulan(['email' => $email]);
     expect($users)->toBeInstanceOf(Users::class)
@@ -268,9 +283,14 @@ it('can use options on the khulan-find to limit selected fields', function () {
 });
 
 it('will remove the cache if a page gets deleted', function () {
-    Khulan::index();
 
     kirby()->impersonate('kirby');
+
+    if ($page = page('home/rainbow')) {
+        $page->delete(); // cleanup
+    }
+
+    Khulan::index();
 
     $page = page('home')->createChild([
         'slug' => 'rainbow',

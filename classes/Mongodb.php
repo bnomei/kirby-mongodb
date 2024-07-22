@@ -75,7 +75,7 @@ final class Mongodb extends Cache
     /**
      * {@inheritDoc}
      */
-    public function set(string $key, $value, int $minutes = 0): bool
+    public function set(string $key, mixed $value, int $minutes = 0): bool
     {
         /* SHOULD SET EVEN IN DEBUG
         if ($this->option('debug')) {
@@ -104,7 +104,7 @@ final class Mongodb extends Cache
             $this->hasCleanedOnce = true;
         }
 
-        $value = $value ?? $this->cacheCollection()->findOne([
+        $value = $this->cacheCollection()->findOne([
             '_id' => $this->key($key),
         ]);
 
@@ -125,7 +125,7 @@ final class Mongodb extends Cache
         return $value;
     }
 
-    public function get(string $key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         if ($this->option('debug')) {
             return $default;
@@ -251,7 +251,7 @@ final class Mongodb extends Cache
         return $this->collection($this->options['collection-content']);
     }
 
-    public static $singleton;
+    public static ?self $singleton = null;
 
     public static function singleton(array $options = []): self
     {

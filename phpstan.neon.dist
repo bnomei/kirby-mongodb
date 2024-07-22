@@ -1,5 +1,5 @@
 parameters:
-    level: 5
+    level: 9
     paths:
         - classes
         - index.php
@@ -8,5 +8,13 @@ parameters:
 
     ignoreErrors:
 #        - '#Undefined variable: \$this#'
+        - '#Instanceof between \*NEVER\* and Kirby\\Cms\\File will always evaluate to false.#'
+        #- '#Instanceof between \*NEVER\* and Kirby\\Cms\\Page will always evaluate to false.#'
+        - '#Instanceof between \*NEVER\* and Kirby\\Cms\\User will always evaluate to false.#'
+        #- '#Cannot call method findOne\(\) on mixed.#'
+        - '#Cannot call method findOneAndUpdate\(\) on mixed.#'
+        - '#Cannot call method deleteMany\(\) on mixed.#'
+        - '#Cannot call method findOne\(\) on mixed.#'
+        - '#Cannot call method createIndex\(\) on mixed.#'
         -
             identifier: missingType.iterableValue

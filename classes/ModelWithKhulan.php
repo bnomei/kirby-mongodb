@@ -25,7 +25,10 @@ trait ModelWithKhulan
     public function hasKhulan(): bool
     {
         if ($this instanceof File) {
-            return $this->parent()->hasKhulan() === true;
+            /** @var \Bnomei\KhulanPage|\Bnomei\KhulanUser $parent */
+            $parent = $this->parent();
+
+            return $parent->hasKhulan() === true;
         }
 
         return true;
@@ -40,7 +43,7 @@ trait ModelWithKhulan
     {
         $key = $this->id(); // can not use UUID since content not loaded yet
         if (! $languageCode) {
-            $languageCode = kirby()->languages()->count() ? kirby()->language()->code() : null;
+            $languageCode = kirby()->languages()->count() ? kirby()->language()?->code() : null;
         }
         if ($languageCode) {
             $key = $key.'-'.$languageCode;
@@ -80,28 +83,34 @@ trait ModelWithKhulan
 
     public function writeKhulan(?array $data = null, ?string $languageCode = null): bool
     {
-        $cache = Mongodb::singleton();
-        if (! $cache || option('bnomei.mongodb.khulan.write') === false) {
+        if (option('bnomei.mongodb.khulan.write') === false) {
             return true;
         }
 
+        /*
         $modified = null;
         if ($this instanceof Site) {
             // site()->modified() does crawl index but not return change of its content file
             $siteFile = site()->storage()->read(
                 site()->storage()->defaultVersion(),
                 kirby()->defaultLanguage()->code()
-            )[0];
+            )[0]; // TODO: this might be a bug
             $modified = $modified.filemtime($siteFile);
         } else {
             $modified = $this->modified();
         }
+        */
+        $modified = $this->modified();
 
         // in rare case file does not exists or is not readable
-        if ($modified === false) {
+        if ($modified === null || $modified === false) {
             $this->deleteKhulan(); // whatever was in the cache is no longer valid
 
             return false; // try again another time
+        }
+        // kirby can return a timestamp as string
+        if (is_numeric($modified)) {
+            $modified = (int) $modified;
         }
 
         $modelType = 'page';
@@ -114,13 +123,14 @@ trait ModelWithKhulan
         }
 
         $meta = [
-            'id' => $this->id() ?? null,
+            'id' => $this->id(),
             'modified' => $modified,
             'modified{}' => new UTCDateTime($modified * 1000),
             'class' => $this::class,
             'language' => $languageCode,
             'modelType' => $modelType,
         ];
+        $this->id();
         if ($this instanceof Page) {
             $slug = explode('/', $this->id());
             $meta['num'] = $this->num() ? (int) $this->num() : null;
@@ -132,8 +142,10 @@ trait ModelWithKhulan
             $meta['sort'] = A::get($data, 'sort') ? (int) A::get($data, 'sort') : null;
             $meta['filename'] = $this->filename();
             $meta['template'] = A::get($data, 'template');
-            $meta['mimeType'] = F::mime($this->root());
-            $meta['parent{}'] = new ObjectId($this->parent()->keyKhulan($languageCode));
+            $meta['mimeType'] = $this->root() ? F::mime($this->root()) : null;
+            /** @var \Bnomei\KhulanPage|\Bnomei\KhulanUser $parent */
+            $parent = $this->parent();
+            $meta['parent{}'] = new ObjectId($parent->keyKhulan($languageCode));
         } elseif ($this instanceof User) {
             $meta['email'] = $this->email();
             $meta['name'] = $this->name()->isNotEmpty() ? $this->name()->value() : null;
@@ -164,8 +176,7 @@ trait ModelWithKhulan
 
     public function deleteKhulan(): bool
     {
-        $cache = Mongodb::singleton();
-        if (! $cache) {
+        if (option('bnomei.mongodb.khulan.write') === false) {
             return true;
         }
 
@@ -182,19 +193,18 @@ trait ModelWithKhulan
 
     public function delete(bool $force = false): bool
     {
-        $cache = Mongodb::singleton();
-        if (! $cache) {
-            return parent::delete($force);
-        }
-
-        $success = parent::delete($force);
+        $success = parent::delete($force); // @phpstan-ignore-line
         $this->deleteKhulan();
 
         return $success;
     }
 
-    public function encodeKhulan(array $data, ?string $languageCode = null): array
+    public function encodeKhulan(?array $data = null, ?string $languageCode = null): array
     {
+        if (! $data) {
+            return [];
+        }
+
         $blueprint = null;
         if ($this instanceof Page) {
             $blueprint = $this->blueprint()->fields();
@@ -318,7 +328,14 @@ trait ModelWithKhulan
         // flatten to array
         $data = iterator_to_array($data);
         // and remove any mongodb objects
-        $data = json_decode(json_encode($data), true);
+        $json_encode = json_encode($data);
+        if (! $json_encode) {
+            throw new Exception('Could not encode data to JSON.');
+        }
+        $data = json_decode($json_encode, true);
+        if (! is_array($data)) {
+            throw new Exception('Could not decode JSON to array.');
+        }
 
         $copy = $data;
 

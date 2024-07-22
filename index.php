@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 use Bnomei\Khulan;
+use Kirby\CLI\CLI;
+use Kirby\Cms\File;
+use Kirby\Cms\Files;
+use Kirby\Cms\Pages;
+use Kirby\Cms\User;
 use Kirby\Filesystem\F;
 use Kirby\Toolkit\Str;
 use MongoDB\Collection;
@@ -94,12 +99,12 @@ Kirby::plugin('bnomei/mongodb', [
         'khulan:index' => [
             'description' => 'Force indexing all pages/files/users',
             'args' => [],
-            'command' => static function (\Kirby\CLI\CLI $cli): void {
+            'command' => static function (CLI $cli): void {
                 $meta = Khulan::index(1);
                 $count = $meta['count'];
                 $time = round($meta['time'] * 1000);
 
-                $cli->success('Indexed '.$count.' in '.$time.'ms.');
+                $cli->success('Indexed '.$count.' in '.$time.'ms.'); // @phpstan-ignore-line
 
                 if (function_exists('janitor')) {
                     janitor()->data($cli->arg('command'), [
@@ -114,14 +119,17 @@ Kirby::plugin('bnomei/mongodb', [
         'system.loadPlugins:after' => function () {
             if ((option('bnomei.mongodb.khulan.read') ||
                 option('bnomei.mongodb.khulan.write')) &&
-                khulan()->countDocuments() === 0) {
+                \Bnomei\Mongodb::singleton()->contentCollection()->countDocuments() === 0) {
                 Khulan::index();
             }
             if (option('bnomei.mongodb.khulan.patch-files-class')) {
-                $filesClass = kirby()->roots()->kirby().'/src/Cms/Files.php';
+                $filesClass = (new ReflectionClass(Files::class))->getFileName();
+                if ($filesClass === false) {
+                    return;
+                }
                 if (F::exists($filesClass) && F::isWritable($filesClass)) {
                     $code = F::read($filesClass);
-                    if (Str::contains($code, '\Bnomei\KhulanFile::factory') === false) {
+                    if ($code && Str::contains($code, '\Bnomei\KhulanFile::factory') === false) {
                         $code = str_replace('File::factory(', '\Bnomei\KhulanFile::factory(', $code);
                         F::write($filesClass, $code);
                     }

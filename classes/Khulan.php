@@ -5,6 +5,7 @@ namespace Bnomei;
 use Kirby\Cms\Collection;
 use Kirby\Cms\File;
 use Kirby\Cms\Files;
+use Kirby\Cms\Language;
 use Kirby\Cms\Page;
 use Kirby\Cms\Pages;
 use Kirby\Cms\Site;
@@ -21,12 +22,13 @@ class Khulan
         $count = 0;
         $time = microtime(true);
 
-        /** @var Page $page */
+        /** @var KhulanPage $page */
         foreach (site()->index(true) as $page) {
             if ($page->hasKhulan() !== true) {
                 continue;
             }
             if (kirby()->multilang()) {
+                /** @var Language $language */
                 foreach (kirby()->languages() as $language) {
                     $content = $page->content($language->code())->toArray();
                     $page->writeKhulan($content, $language->code());
@@ -37,12 +39,13 @@ class Khulan
             $count++;
         }
 
-        /** @var User $user */
+        /** @var KhulanUser $user */
         foreach (kirby()->users() as $user) {
             if ($user->hasKhulan() !== true) {
                 continue;
             }
             if (kirby()->multilang()) {
+                /** @var Language $language */
                 foreach (kirby()->languages() as $language) {
                     $content = $user->content($language->code())->toArray();
                     $user->writeKhulan($content, $language->code());
@@ -53,12 +56,13 @@ class Khulan
             $count++;
         }
 
-        /** @var File $file */
+        /** @var KhulanFile $file */
         foreach (site()->index(true)->files() as $file) {
             if ($file->hasKhulan() !== true) {
                 continue;
             }
             if (kirby()->multilang()) {
+                /** @var Language $language */
                 foreach (kirby()->languages() as $language) {
                     $contentFile = $file->root().'.'.$language->code().'.txt';
                     if (! F::exists($contentFile)) {
@@ -115,7 +119,7 @@ class Khulan
 
     public static function flush(): bool
     {
-        mongo()->contentCollection()->drop();
+        Mongodb::singleton()->contentCollection()->drop();
 
         return true;
     }
@@ -158,7 +162,7 @@ class Khulan
         return null;
     }
 
-    public static function documentToModel($document = null): Page|File|User|Site|null
+    public static function documentToModel(mixed $document = null): Page|File|User|Site|null
     {
         if (! $document) {
             return null;

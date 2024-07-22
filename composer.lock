@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3cfb4716ea326a65795bf69e2fe1a4ec",
+    "content-hash": "d534bd3aeea2fea4e1b3a2996cfb3846",
     "packages": [
         {
             "name": "getkirby/composer-installer",
@@ -1094,6 +1094,72 @@
                 }
             ],
             "time": "2023-10-12T05:21:21+00:00"
+        },
+        {
+            "name": "getkirby/cli",
+            "version": "1.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/getkirby/cli.git",
+                "reference": "e1d18565828623607e5b8ab65eaf0ed93600f8e1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/getkirby/cli/zipball/e1d18565828623607e5b8ab65eaf0ed93600f8e1",
+                "reference": "e1d18565828623607e5b8ab65eaf0ed93600f8e1",
+                "shasum": ""
+            },
+            "require": {
+                "composer-runtime-api": "^2.2",
+                "ext-zip": "*",
+                "guzzlehttp/guzzle": "^7.8",
+                "league/climate": "^3.8.2",
+                "php": "~8.1.0 || ~8.2.0 || ~8.3.0"
+            },
+            "bin": [
+                "bin/kirby"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Kirby\\": [
+                        "src/",
+                        "tests/"
+                    ]
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kirby Team",
+                    "email": "support@getkirby.com",
+                    "homepage": "https://getkirby.com"
+                }
+            ],
+            "description": "Kirby command line interface",
+            "homepage": "https://getkirby.com",
+            "keywords": [
+                "cli",
+                "cms",
+                "command",
+                "kirby"
+            ],
+            "support": {
+                "email": "support@getkirby.com",
+                "forum": "https://forum.getkirby.com",
+                "issues": "https://github.com/getkirby/cli/issues",
+                "source": "https://github.com/getkirby/cli"
+            },
+            "funding": [
+                {
+                    "url": "https://getkirby.com/buy",
+                    "type": "custom"
+                }
+            ],
+            "time": "2024-05-21T13:13:08+00:00"
         },
         {
             "name": "getkirby/cms",
@@ -2804,6 +2870,71 @@
                 "source": "https://github.com/laravel/prompts/tree/v0.1.24"
             },
             "time": "2024-06-17T13:58:22+00:00"
+        },
+        {
+            "name": "league/climate",
+            "version": "3.8.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/thephpleague/climate.git",
+                "reference": "a785a3ac8f584eed4abd45e4e16fe64c46659a28"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/thephpleague/climate/zipball/a785a3ac8f584eed4abd45e4e16fe64c46659a28",
+                "reference": "a785a3ac8f584eed4abd45e4e16fe64c46659a28",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.3 || ^8.0",
+                "psr/log": "^1.0 || ^2.0 || ^3.0",
+                "seld/cli-prompt": "^1.0"
+            },
+            "require-dev": {
+                "mikey179/vfsstream": "^1.6.10",
+                "mockery/mockery": "^1.4.2",
+                "phpunit/phpunit": "^9.5.10"
+            },
+            "suggest": {
+                "ext-mbstring": "If ext-mbstring is not available you MUST install symfony/polyfill-mbstring"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "League\\CLImate\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Joe Tannenbaum",
+                    "email": "hey@joe.codes",
+                    "homepage": "http://joe.codes/",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Craig Duncan",
+                    "email": "git@duncanc.co.uk",
+                    "homepage": "https://github.com/duncan3dc",
+                    "role": "Developer"
+                }
+            ],
+            "description": "PHP's best friend for the terminal. CLImate allows you to easily output colored text, special formats, and more.",
+            "keywords": [
+                "cli",
+                "colors",
+                "command",
+                "php",
+                "terminal"
+            ],
+            "support": {
+                "issues": "https://github.com/thephpleague/climate/issues",
+                "source": "https://github.com/thephpleague/climate/tree/3.8.2"
+            },
+            "time": "2022-06-18T14:42:08+00:00"
         },
         {
             "name": "league/color-extractor",
@@ -6228,6 +6359,61 @@
                 }
             ],
             "time": "2023-02-07T11:34:05+00:00"
+        },
+        {
+            "name": "seld/cli-prompt",
+            "version": "1.0.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Seldaek/cli-prompt.git",
+                "reference": "b8dfcf02094b8c03b40322c229493bb2884423c5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Seldaek/cli-prompt/zipball/b8dfcf02094b8c03b40322c229493bb2884423c5",
+                "reference": "b8dfcf02094b8c03b40322c229493bb2884423c5",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^0.12.63"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Seld\\CliPrompt\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jordi Boggiano",
+                    "email": "j.boggiano@seld.be"
+                }
+            ],
+            "description": "Allows you to prompt for user input on the command line, and optionally hide the characters they type",
+            "keywords": [
+                "cli",
+                "console",
+                "hidden",
+                "input",
+                "prompt"
+            ],
+            "support": {
+                "issues": "https://github.com/Seldaek/cli-prompt/issues",
+                "source": "https://github.com/Seldaek/cli-prompt/tree/1.0.4"
+            },
+            "time": "2020-12-15T21:32:01+00:00"
         },
         {
             "name": "spatie/backtrace",

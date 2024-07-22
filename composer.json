@@ -46,6 +46,7 @@
         "ext-mongodb": "*"
     },
     "require-dev": {
+        "getkirby/cli": "^1.5.0",
         "getkirby/cms": "^4.3.0",
         "larastan/larastan": "^2.9",
         "laravel/pint": "^1.13",
