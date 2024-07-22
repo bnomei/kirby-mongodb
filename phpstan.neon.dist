@@ -2,12 +2,11 @@ parameters:
     level: 5
     paths:
         - classes
-        - collections
         - index.php
     excludePaths:
         - tests
-        - collections/example_*.php
-    checkMissingIterableValueType: false
 
     ignoreErrors:
-        - '#Undefined variable: \$this#'
+#        - '#Undefined variable: \$this#'
+        -
+            identifier: missingType.iterableValue

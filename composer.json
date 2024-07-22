@@ -1,7 +1,7 @@
 {
     "name": "bnomei/kirby-mongodb",
     "type": "kirby-plugin",
-    "version": "1.4.3",
+    "version": "1.4.4",
     "description": "Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB",
     "license": "MIT",
     "authors": [
@@ -56,7 +56,11 @@
     "scripts": {
         "analyze": "./vendor/bin/phpstan",
         "fix": "./vendor/bin/pint",
-        "test": "./vendor/bin/pest --coverage",
+        "test": "./vendor/bin/pest",
+        "coverage": [
+            "php tests/patch.php",
+            "./vendor/bin/pest --coverage"
+        ],
         "dist": [
             "composer install --no-dev --optimize-autoloader",
             "git rm -rf --cached .; git add .;"
@@ -71,5 +75,10 @@
     },
     "extra": {
         "kirby-cms-path": "tests/kirby"
+    },
+    "suggest": {
+        "bnomei/kirby-blueprints": "PHP Class-based Blueprints for Kirby CMS for better type safety and code completion.",
+        "bnomei/kirby3-lapse": "Cache any data until set expiration time (with automatic keys).",
+        "getkirby/staticache": "Static site performance on demand!"
     }
 }

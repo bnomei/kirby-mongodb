@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bnomei;
 
 use Kirby\Cache\Cache;
+use Kirby\Cache\FileCache;
 use Kirby\Cache\Value;
 use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
@@ -151,7 +152,10 @@ final class Mongodb extends Cache
         return $this->cacheCollection()->deleteMany([])->isAcknowledged();
     }
 
-    public function benchmark(int $count = 10)
+    /**
+     * @codeCoverageIgnore
+     */
+    public function benchmark(int $count = 10): void
     {
         $prefix = 'mongodb-benchmark-';
         $mongodb = $this;
@@ -188,7 +192,10 @@ final class Mongodb extends Cache
      */
     public function root(): string
     {
-        return kirby()->cache('bnomei.mongodb')->root();
+        /** @var FileCache $cache */
+        $cache = kirby()->cache('bnomei.mongodb');
+
+        return $cache->root();
     }
 
     public function clean(?int $time = null): ?int

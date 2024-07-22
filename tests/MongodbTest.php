@@ -23,9 +23,11 @@ it('can have options', function () {
     Mongodb::$singleton = null;
     $mongodb = Mongodb::singleton([
         'debug' => true, // default is false from config
+        'uriOptions' => fn () => [],
     ]);
 
-    expect($mongodb->option('debug'))->toBe(true);
+    expect($mongodb->option('debug'))->toBe(true)
+        ->and($mongodb->option('uriOptions'))->toBeArray();
 
     Mongodb::$singleton = null;
 });
@@ -67,7 +69,11 @@ it('can use the cache', function () {
     $mongodb->set('test', 'value');
     $value = $mongodb->get('test');
 
-    expect($value)->toBe('value');
+    expect($value)->toBe('value')
+        ->and($mongodb->root())->toBeDirectory()
+        ->and($mongodb->cache())->toBe($mongodb)
+        ->and($mongodb->remove('test'))->toBeTrue()
+        ->and($mongodb->get('test'))->toBeNull();
 });
 
 it('can use the cache for array based values', function () {
@@ -107,7 +113,8 @@ it('will not use the cache in debug mode', function () {
         'debug' => true,
     ]);
 
-    expect($mongodb->option('debug'))->toBeTrue();
+    expect($mongodb->option('debug'))->toBeTrue()
+        ->and($mongodb->option()['debug'])->toBeTrue();
 
     $mongodb->set('test', 'value');
     expect($mongodb->get('test'))->toBeNull();
@@ -258,6 +265,63 @@ it('can use options on the khulan-find to limit selected fields', function () {
     ]);
 
     expect($page)->not()->toBeNull();
+});
+
+it('will remove the cache if a page gets deleted', function () {
+    Khulan::index();
+
+    kirby()->impersonate('kirby');
+
+    $page = page('home')->createChild([
+        'slug' => 'rainbow',
+        'template' => 'default',
+        'content' => [
+            'title' => 'Rainbow',
+            'uuid' => 'rainbow',
+        ],
+    ]);
+
+    $page = khulan('rainbow');
+    expect($page)->not()->toBeNull();
+
+    $page->delete();
+    $page = khulan('rainbow');
+    expect($page)->toBeNull();
+});
+
+it('can flush the content cache', function () {
+    Khulan::index();
+
+    $page = khulan('betterharder');
+    expect($page)->not()->toBeNull();
+
+    Khulan::flush();
+    $page = khulan('betterharder');
+    expect($page)->toBeNull();
+});
+
+it('can convert documents to models', function () {
+    Khulan::index();
+
+    $documents = khulan()->find([
+        'template' => 'default',
+        'status' => 'listed',
+        'language' => 'en',
+        'category[,]' => 'books',
+    ]);
+
+    $models = Khulan::documentsToModels($documents);
+    expect($models)->toBeInstanceOf(\Kirby\Cms\Pages::class);
+});
+
+it('can encode and decode data for mongodb', function () {
+    /** @var \Bnomei\KhulanPage $page */
+    $page = page('betterharder');
+    $data = $page->content()->toArray();
+    $encoded = $page->encodeKhulan($data);
+    $decoded = $page->decodeKhulan($encoded);
+
+    expect($decoded)->toBe($data);
 });
 
 it('can run the benchmark', function () {
