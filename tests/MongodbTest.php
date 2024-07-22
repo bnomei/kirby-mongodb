@@ -224,6 +224,7 @@ it('can find a user by email', function () {
         'email' => 'test@bnomei.com',
         'role' => 'admin',
         'model' => 'admin',
+        'password' => 'testtest',
     ]);
     // NOTE: both role and model are needed
     // for the user to be indexed
@@ -240,6 +241,15 @@ it('can find a user by email', function () {
 
 it('can find a file', function () {
     Khulan::index();
+    $lang = kirby()->language()->code();
+
+    // TODO: for some reason this is not working in CI
+    // without pushing the file to the cache manually
+    /** @var \Bnomei\KhulanFile $file */
+    $file = kirby()->file('betterharder/image.jpg');
+    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+        ->and($file->filename())->toBe('image.jpg')
+        ->and($file->writeKhulan($file->content($lang)->toArray(), $lang));
 
     $file = khulan('betterharder/image.jpg');
     expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)

@@ -169,16 +169,16 @@ class Khulan
         }
 
         if ($document['modelType'] === 'file') {
-            return kirby()->file($document['id']);
+            return kirby()->file(strval($document['id'])); // @phpstan-ignore-line
         } elseif ($document['modelType'] === 'user') {
-            return kirby()->user($document['id']);
+            return kirby()->user(strval($document['id'])); // @phpstan-ignore-line
         } elseif ($document['modelType'] === 'site') {
             return kirby()->site();
         } elseif ($document['modelType'] === 'page') {
-            $document = iterator_to_array($document);
+            $document = iterator_to_array($document); // @phpstan-ignore-line
             $id = A::get($document, 'id', A::get($document, 'uuid'));
 
-            return kirby()->page($id);
+            return kirby()->page(strval($id));
         }
 
         return null;

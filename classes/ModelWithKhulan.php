@@ -103,14 +103,20 @@ trait ModelWithKhulan
         $modified = $this->modified();
 
         // in rare case file does not exists or is not readable
-        if ($modified === null || $modified === false) {
+        if ($modified === false || empty($modified)) {
             $this->deleteKhulan(); // whatever was in the cache is no longer valid
 
             return false; // try again another time
         }
         // kirby can return a timestamp as string
-        if (is_numeric($modified)) {
+        if (is_string($modified) && is_numeric($modified)) {
             $modified = (int) $modified;
+        }
+        // failed
+        if (! is_int($modified)) {
+            $this->deleteKhulan(); // whatever was in the cache is no longer valid
+
+            return false; // try again another time
         }
 
         $modelType = 'page';
