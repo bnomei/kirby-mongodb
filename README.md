@@ -1,10 +1,8 @@
 # 🐎 Khulan - Kirby MongoDB
 
-![Release](https://flat.badgen.net/packagist/v/bnomei/kirby-mongodb?color=ae81ff)
-![Downloads](https://flat.badgen.net/packagist/dt/bnomei/kirby-mongodb?color=272822)
-[![Coverage](https://flat.badgen.net/codeclimate/coverage/bnomei/kirby-mongodb)](https://codeclimate.com/github/bnomei/kirby-mongodb)
-[![Maintainability](https://flat.badgen.net/codeclimate/maintainability/bnomei/kirby-mongodb)](https://codeclimate.com/github/bnomei/kirby-mongodb)
-[![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da)](https://discordapp.com/users/bnomei)
+![Release](https://flat.badgen.net/packagist/v/bnomei/kirby-mongodb?color=ae81ff&icon=github&label)
+[![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da&icon=discord&label)](https://discordapp.com/users/bnomei)
+[![Buymecoffee](https://flat.badgen.net/badge/icon/donate?icon=buymeacoffee&color=FF813F&label)](https://www.buymeacoffee.com/bnomei)
 
 Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB.
 
