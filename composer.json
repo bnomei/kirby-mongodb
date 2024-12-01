@@ -1,7 +1,7 @@
 {
     "name": "bnomei/kirby-mongodb",
     "type": "kirby-plugin",
-    "version": "1.4.4",
+    "version": "1.4.5",
     "description": "Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB",
     "license": "MIT",
     "authors": [
@@ -23,10 +23,8 @@
         "nosql",
         "mongodb"
     ],
-    "autoload": {
-        "psr-4": {
-            "Bnomei\\": "classes/"
-        }
+    "conflict": {
+        "bnomei/kirby3-boost": "*"
     },
     "config": {
         "optimize-autoloader": true,
@@ -36,8 +34,10 @@
             "pestphp/pest-plugin": true
         }
     },
-    "conflict": {
-        "bnomei/kirby3-boost": "*"
+    "autoload": {
+        "psr-4": {
+            "Bnomei\\": "classes/"
+        }
     },
     "require": {
         "php": ">=8.2.0",
@@ -46,23 +46,18 @@
         "ext-mongodb": "*"
     },
     "require-dev": {
-        "getkirby/cli": "^1.5.0",
-        "getkirby/cms": "^4.3.0",
-        "larastan/larastan": "^2.9",
+        "getkirby/cms": "^5.0.0-alpha.4",
+        "larastan/larastan": "^v3.0.0",
         "laravel/pint": "^1.13",
-        "pestphp/pest": "^2.24",
-        "pestphp/pest-plugin-type-coverage": "^2.4",
-        "spatie/ray": "^1.41"
+        "pestphp/pest": "^v3.5.1",
+        "spatie/ray": "^1.39"
     },
     "scripts": {
-        "analyze": "./vendor/bin/phpstan",
+        "stan": "./vendor/bin/phpstan",
         "fix": "./vendor/bin/pint",
-        "test": "./vendor/bin/pest",
-        "coverage": [
-            "php tests/patch.php",
-            "./vendor/bin/pest --coverage"
-        ],
+        "test": "./vendor/bin/pest --profile",
         "dist": [
+            "composer fix",
             "composer install --no-dev --optimize-autoloader",
             "git rm -rf --cached .; git add .;"
         ],
@@ -71,7 +66,8 @@
             "composer update",
             "composer install --working-dir=tests/kirby --no-dev --optimize-autoloader",
             "composer update --working-dir=tests/kirby",
-            "php tests/patch.php"
+            "sed -i.bak 's/function dump(/function xdump(/g' tests/kirby/config/helpers.php",
+            "sed -i.bak 's/function e(/function xe(/g' tests/kirby/config/helpers.php"
         ]
     },
     "extra": {
