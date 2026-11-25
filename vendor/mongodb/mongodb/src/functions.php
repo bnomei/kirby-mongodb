@@ -21,6 +21,7 @@ use Exception;
 use MongoDB\BSON\Document;
 use MongoDB\BSON\PackedArray;
 use MongoDB\BSON\Serializable;
+use MongoDB\Builder\Type\StageInterface;
 use MongoDB\Driver\Exception\RuntimeException as DriverRuntimeException;
 use MongoDB\Driver\Manager;
 use MongoDB\Driver\ReadPreference;
@@ -34,6 +35,7 @@ use MongoDB\Operation\WithTransaction;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use ReflectionException;
+use stdClass;
 
 use function array_is_list;
 use function array_key_first;
@@ -43,6 +45,7 @@ use function get_object_vars;
 use function is_array;
 use function is_object;
 use function is_string;
+use function str_contains;
 use function str_ends_with;
 use function substr;
 
@@ -66,6 +69,22 @@ function add_logger(LoggerInterface $logger): void
 function remove_logger(LoggerInterface $logger): void
 {
     PsrLogAdapter::removeLogger($logger);
+}
+
+/**
+ * Create a new stdClass instance with the provided properties.
+ * Use named arguments to specify the property names.
+ *     object( property1: value1, property2: value2 )
+ *
+ * If property names contain a dot or a dollar characters, use array unpacking syntax.
+ *     object( ...[ 'author.name' => 1, 'array.$' => 1 ] )
+ *
+ * @psalm-suppress MoreSpecificReturnType
+ * @psalm-suppress LessSpecificReturnStatement
+ */
+function object(mixed ...$values): stdClass
+{
+    return (object) $values;
 }
 
 /**
@@ -107,7 +126,7 @@ function all_servers_support_write_stage_on_secondary(array $servers): bool
  * @return array|object
  * @throws InvalidArgumentException
  */
-function apply_type_map_to_document($document, array $typeMap)
+function apply_type_map_to_document(array|object $document, array $typeMap)
 {
     if (! is_document($document)) {
         throw InvalidArgumentException::expectedDocumentType('$document', $document);
@@ -127,10 +146,9 @@ function apply_type_map_to_document($document, array $typeMap)
  * encode as BSON arrays.
  *
  * @internal
- * @param array|object $document
  * @throws InvalidArgumentException if $document is not an array or object
  */
-function document_to_array($document): array
+function document_to_array(array|object $document): array
 {
     if ($document instanceof Document || $document instanceof PackedArray) {
         /* Nested documents and arrays are intentionally left as BSON. We avoid
@@ -152,10 +170,6 @@ function document_to_array($document): array
          * includes untyped, uninitialized properties. This is acceptable given
          * document_to_array()'s use cases. */
         $document = get_object_vars($document);
-    }
-
-    if (! is_array($document)) {
-        throw InvalidArgumentException::expectedDocumentType('$document', $document);
     }
 
     return $document;
@@ -188,13 +202,8 @@ function get_encrypted_fields_from_driver(string $databaseName, string $collecti
  * @see Database::dropCollection()
  * @return array|object|null
  */
-function get_encrypted_fields_from_server(string $databaseName, string $collectionName, Manager $manager, Server $server)
+function get_encrypted_fields_from_server(string $databaseName, string $collectionName, Server $server)
 {
-    // No-op if the encryptedFieldsMap autoEncryption driver option was omitted
-    if ($manager->getEncryptedFieldsMap() === null) {
-        return null;
-    }
-
     $collectionInfoIterator = (new ListCollections($databaseName, ['filter' => ['name' => $collectionName]]))->execute($server);
 
     foreach ($collectionInfoIterator as $collectionInfo) {
@@ -215,9 +224,8 @@ function get_encrypted_fields_from_server(string $databaseName, string $collecti
  * BSON PackedArray instances
  *
  * @internal
- * @param mixed $document
  */
-function is_document($document): bool
+function is_document(mixed $document): bool
 {
     return is_array($document) || (is_object($document) && ! $document instanceof PackedArray);
 }
@@ -231,10 +239,9 @@ function is_document($document): bool
  * $document has an unexpected type instead of returning false.
  *
  * @internal
- * @param array|object $document
  * @throws InvalidArgumentException if $document is not an array or object
  */
-function is_first_key_operator($document): bool
+function is_first_key_operator(array|object $document): bool
 {
     if ($document instanceof PackedArray) {
         return false;
@@ -274,10 +281,9 @@ function is_first_key_operator($document): bool
  * returns a non-array, non-object value from its bsonSerialize() method.
  *
  * @internal
- * @param array|object $pipeline
  * @throws InvalidArgumentException
  */
-function is_pipeline($pipeline, bool $allowEmpty = false): bool
+function is_pipeline(array|object $pipeline, bool $allowEmpty = false): bool
 {
     if ($pipeline instanceof PackedArray) {
         /* Nested documents and arrays are intentionally left as BSON. We avoid
@@ -316,6 +322,27 @@ function is_pipeline($pipeline, bool $allowEmpty = false): bool
     }
 
     return true;
+}
+
+/**
+ * Returns whether the argument is a list that contains at least one
+ * {@see StageInterface} object.
+ *
+ * @internal
+ */
+function is_builder_pipeline(array $pipeline): bool
+{
+    if (! $pipeline || ! array_is_list($pipeline)) {
+        return false;
+    }
+
+    foreach ($pipeline as $stage) {
+        if (is_object($stage) && $stage instanceof StageInterface) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -368,7 +395,7 @@ function is_last_pipeline_operator_write(array $pipeline): bool
  * @see https://mongodb.com/docs/manual/reference/command/mapReduce/#output-inline
  * @param string|array|object $out Output specification
  */
-function is_mapreduce_output_inline($out): bool
+function is_mapreduce_output_inline(string|array|object $out): bool
 {
     if (! is_array($out) && ! is_object($out)) {
         return false;
@@ -404,8 +431,8 @@ function is_write_concern_acknowledged(WriteConcern $writeConcern): bool
 function server_supports_feature(Server $server, int $feature): bool
 {
     $info = $server->getInfo();
-    $maxWireVersion = isset($info['maxWireVersion']) ? (integer) $info['maxWireVersion'] : 0;
-    $minWireVersion = isset($info['minWireVersion']) ? (integer) $info['minWireVersion'] : 0;
+    $maxWireVersion = isset($info['maxWireVersion']) ? (int) $info['maxWireVersion'] : 0;
+    $minWireVersion = isset($info['minWireVersion']) ? (int) $info['minWireVersion'] : 0;
 
     return $minWireVersion <= $feature && $maxWireVersion >= $feature;
 }
@@ -414,9 +441,8 @@ function server_supports_feature(Server $server, int $feature): bool
  * Return whether the input is an array of strings.
  *
  * @internal
- * @param mixed $input
  */
-function is_string_array($input): bool
+function is_string_array(mixed $input): bool
 {
     if (! is_array($input)) {
         return false;
@@ -432,6 +458,30 @@ function is_string_array($input): bool
 }
 
 /**
+ * Validates a database and collection name and returns the namespace formed
+ * by concatenating them.
+ *
+ * A "." or NUL byte in the database name, or a NUL byte in the collection
+ * name, would shift the namespace split performed by the server and cause
+ * the operation to silently target a different database or collection.
+ *
+ * @internal
+ * @throws InvalidArgumentException if either name is invalid
+ */
+function create_namespace(string $databaseName, string $collectionName): string
+{
+    if ($databaseName === '' || str_contains($databaseName, '.') || str_contains($databaseName, "\0")) {
+        throw new InvalidArgumentException('$databaseName is invalid: ' . $databaseName);
+    }
+
+    if ($collectionName === '' || str_contains($collectionName, "\0")) {
+        throw new InvalidArgumentException('$collectionName is invalid: ' . $collectionName);
+    }
+
+    return $databaseName . '.' . $collectionName;
+}
+
+/**
  * Performs a deep copy of a value.
  *
  * This function will clone objects and recursively copy values within arrays.
@@ -442,7 +492,7 @@ function is_string_array($input): bool
  * @return mixed
  * @throws ReflectionException
  */
-function recursive_copy($element)
+function recursive_copy(mixed $element)
 {
     if (is_array($element)) {
         foreach ($element as $key => $value) {

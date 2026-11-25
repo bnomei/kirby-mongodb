@@ -11,7 +11,7 @@ use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
 use MongoDB\Client;
 use MongoDB\Collection;
-use MongoDB\Model\BSONDocument;
+use MongoDB\Driver\Exception\Exception;
 
 use function option;
 
@@ -72,6 +72,17 @@ final class Mongodb extends Cache
         return hash('xxh3', $key);
     }
 
+    public function enabled(): bool
+    {
+        try {
+            $this->client()->selectDatabase($this->options['database'])->command(['ping' => 1]);
+
+            return true;
+        } catch (Exception) {
+            return false;
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -83,7 +94,7 @@ final class Mongodb extends Cache
         }
         */
 
-        $document = $this->cacheCollection()->findOneAndUpdate(
+        $result = $this->cacheCollection()->updateOne(
             ['_id' => $this->key($key)],
             ['$set' => (new Value($value, $minutes))->toArray() + [
                 'expires_at' => $minutes ? time() + $minutes * 60 : null,
@@ -91,7 +102,7 @@ final class Mongodb extends Cache
             ['upsert' => true]
         );
 
-        return $document !== null;
+        return $result->isAcknowledged();
     }
 
     /**
@@ -106,23 +117,9 @@ final class Mongodb extends Cache
 
         $value = $this->cacheCollection()->findOne([
             '_id' => $this->key($key),
-        ]);
+        ], ['typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array']]);
 
-        if (! $value) {
-            return null;
-        }
-
-        if (is_array($value)) {
-            $value = $value[0];
-        }
-
-        if ($value instanceof BSONDocument) {
-            $value = $value->getArrayCopy();
-        }
-
-        $value = is_array($value) ? Value::fromArray($value) : $value;
-
-        return $value;
+        return is_array($value) ? Value::fromArray($value) : null;
     }
 
     public function get(string $key, mixed $default = null): mixed

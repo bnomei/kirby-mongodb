@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use Bnomei\Khulan;
+use Bnomei\KhulanStorage;
+use Bnomei\Mongodb;
 use Kirby\CLI\CLI;
-use Kirby\Cms\File;
-use Kirby\Cms\Files;
-use Kirby\Cms\Pages;
-use Kirby\Cms\User;
-use Kirby\Filesystem\F;
-use Kirby\Toolkit\Str;
+use Kirby\Cms\App;
+use Kirby\Cms\ModelWithContent;
+use Kirby\Content\PlainTextStorage;
+use Kirby\Content\Storage;
+use MongoDB\BSON\ObjectId;
 use MongoDB\Collection;
 
 @include_once __DIR__.'/vendor/autoload.php';
@@ -17,17 +18,19 @@ use MongoDB\Collection;
 load([
     'bnomei\\mongodb' => 'classes/Mongodb.php',
     'bnomei\\khulan' => 'classes/Khulan.php',
+    'bnomei\\khulandocument' => 'classes/KhulanDocument.php',
+    'bnomei\\khulanstorage' => 'classes/KhulanStorage.php',
     'bnomei\\modelwithkhulan' => 'classes/ModelWithKhulan.php',
 ], __DIR__);
 
 if (! function_exists('mongo')) {
-    function mongo(?string $collection = null): \Bnomei\Mongodb|Collection
+    function mongo(?string $collection = null): Mongodb|Collection
     {
         if (! $collection) {
-            return \Bnomei\Mongodb::singleton();
+            return Mongodb::singleton();
         }
 
-        return \Bnomei\Mongodb::singleton()->collection($collection);
+        return Mongodb::singleton()->collection($collection);
     }
 }
 
@@ -35,7 +38,7 @@ if (! function_exists('khulan')) {
 
     function khulan(string|array|null $search = null, ?array $options = null): mixed
     {
-        $collection = \Bnomei\Mongodb::singleton()->contentCollection();
+        $collection = Mongodb::singleton()->contentCollection();
 
         // only get these fields as it is faster and enough for kirby
         $options ??= [
@@ -43,6 +46,7 @@ if (! function_exists('khulan')) {
                 'id' => 1,
                 'uuid' => 1,
                 'modelType' => 1,
+                'parentType' => 1,
             ],
         ];
 
@@ -52,7 +56,7 @@ if (! function_exists('khulan')) {
         } elseif (is_string($search)) {
             return Khulan::documentToModel($collection->findOne([
                 '$or' => [
-                    ['_id' => $search],
+                    ['_id' => preg_match('/^[a-f0-9]{24}$/iD', $search) ? new ObjectId($search) : $search],
                     ['id' => $search],
                     ['uuid' => $search],
                     ['email' => $search], // user
@@ -89,22 +93,29 @@ Kirby::plugin('bnomei/mongodb', [
         'khulan' => [ // cache for models
             'read' => false, // mongodb is most likely slower than file system for the pages
             'write' => true,
-            'patch-files-class' => true, // monkey patch files class
+            'patch-files-class' => true, // include file metadata for opted-in parents
         ],
     ],
     'cacheTypes' => [
-        'mongodb' => \Bnomei\Mongodb::class,
+        'mongodb' => Mongodb::class,
+    ],
+    'components' => [
+        'storage' => static function (App $kirby, ModelWithContent $model): Storage {
+            return KhulanStorage::supports($model)
+                ? new KhulanStorage($model)
+                : new PlainTextStorage($model);
+        },
     ],
     'commands' => [
         'khulan:index' => [
             'description' => 'Force indexing all pages/files/users',
             'args' => [],
             'command' => static function (CLI $cli): void {
-                $meta = Khulan::index(1);
+                $meta = Khulan::index();
                 $count = $meta['count'];
                 $time = round($meta['time'] * 1000);
 
-                $cli->success('Indexed '.$count.' in '.$time.'ms.'); // @phpstan-ignore-line
+                $cli->success('Indexed '.$count.' in '.$time.'ms.');
 
                 if (function_exists('janitor')) {
                     janitor()->data($cli->arg('command'), [
@@ -116,24 +127,29 @@ Kirby::plugin('bnomei/mongodb', [
         ],
     ],
     'hooks' => [
+        // These actions can move directories or update model metadata without a content write.
+        ...array_fill_keys(['page.changeStatus:after', 'page.changeNum:after', 'page.changeSlug:after', 'page.changeTemplate:after', 'page.move:after'], function ($newPage, $oldPage) {
+            Khulan::refreshPage($newPage, $oldPage);
+        }),
+        'page.duplicate:after' => function ($duplicatePage) {
+            Khulan::refreshPage($duplicatePage);
+        },
+        'file.changeName:after' => function ($newFile, $oldFile) {
+            if (($storage = $newFile->storage()) instanceof KhulanStorage && option('bnomei.mongodb.khulan.write')) {
+                Khulan::removeDocuments(['id' => $oldFile->id(), 'modelType' => 'file', 'parentType' => $oldFile->parent()::CLASS_ALIAS]);
+                $storage->indexLanguages();
+            }
+        },
+        ...array_fill_keys(['user.changeName:after', 'user.changeEmail:after', 'user.changeRole:after'], function ($newUser) {
+            if (($storage = $newUser->storage()) instanceof KhulanStorage) {
+                $storage->indexLanguages();
+            }
+        }),
         'system.loadPlugins:after' => function () {
             if ((option('bnomei.mongodb.khulan.read') ||
                 option('bnomei.mongodb.khulan.write')) &&
-                \Bnomei\Mongodb::singleton()->contentCollection()->countDocuments() === 0) {
+                Mongodb::singleton()->contentCollection()->countDocuments() === 0) {
                 Khulan::index();
-            }
-            if (option('bnomei.mongodb.khulan.patch-files-class')) {
-                $filesClass = (new ReflectionClass(Files::class))->getFileName();
-                if ($filesClass === false) {
-                    return;
-                }
-                if (F::exists($filesClass) && F::isWritable($filesClass)) {
-                    $code = F::read($filesClass);
-                    if ($code && Str::contains($code, '\Bnomei\KhulanFile::factory') === false) {
-                        $code = str_replace('File::factory(', '\Bnomei\KhulanFile::factory(', $code);
-                        F::write($filesClass, $code);
-                    }
-                }
             }
         },
     ],

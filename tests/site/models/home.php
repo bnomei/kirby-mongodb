@@ -1,3 +1,5 @@
 <?php
 
-class HomePage extends \Kirby\Cms\Page {}
+use Kirby\Cms\Page;
+
+class HomePage extends Page {}

@@ -1,8 +1,13 @@
 <?php
 
 use Bnomei\Khulan;
+use Bnomei\KhulanFile;
+use Bnomei\KhulanPage;
+use Bnomei\KhulanUser;
 use Bnomei\Mongodb;
+use Kirby\Cms\File;
 use Kirby\Cms\Page;
+use Kirby\Cms\Pages;
 use Kirby\Cms\User;
 use Kirby\Cms\Users;
 use MongoDB\BSON\ObjectId;
@@ -66,7 +71,8 @@ it('can create and read a document', function () {
 
 it('can use the cache', function () {
     $mongodb = mongo();
-    $mongodb->set('test', 'value');
+    expect($mongodb->enabled())->toBeTrue()
+        ->and($mongodb->set('test', 'value'))->toBeTrue();
     $value = $mongodb->get('test');
 
     expect($value)->toBe('value')
@@ -78,10 +84,12 @@ it('can use the cache', function () {
 
 it('can use the cache for array based values', function () {
     $mongodb = mongo();
-    $mongodb->set('tagging', [
+    $value = [
         'tags' => ['tag1', 'tag2'],
         'not_value' => 'notmyvalue',
-    ]);
+    ];
+    expect($mongodb->set('tagging', $value))->toBeTrue()
+        ->and($mongodb->get('tagging'))->toBe($value);
 
     $collection = mongo()->cacheCollection();
     $documents = $collection->find([
@@ -219,7 +227,7 @@ it('can find a user by email', function () {
 
     Khulan::index();
 
-    /** @var \Bnomei\KhulanUser $user */
+    /** @var KhulanUser $user */
     $user = kirby()->users()->create([
         'email' => 'test@bnomei.com',
         'role' => 'admin',
@@ -242,15 +250,15 @@ it('can find a user by email', function () {
 it('can find a file', function () {
     Khulan::index();
 
-    /** @var \Bnomei\KhulanFile $file */
+    /** @var KhulanFile $file */
     $file = kirby()->file('betterharder/image.jpg');
-    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+    expect($file)->toBeInstanceOf(File::class)
         ->and($file->filename())->toBe('image.jpg');
 
     $file = khulan('betterharder/image.jpg');
-    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+    expect($file)->toBeInstanceOf(File::class)
         ->and($file->filename())->toBe('image.jpg');
-})->skipOnLinux('Does not work in CI for some reason');
+});
 
 it('will use the indices', function () {
     Khulan::index();
@@ -315,6 +323,53 @@ it('will remove the cache if a page gets deleted', function () {
     expect($page)->toBeNull();
 });
 
+it('indexes only saved latest translations, including unpublished pages', function () {
+    kirby()->impersonate('kirby');
+    $page = page('home')->createChild(['slug' => 'translations', 'template' => 'default', 'content' => ['title' => 'First', 'flag' => '0']]);
+    $id = $page->id();
+    try {
+        expect(khulan()->countDocuments(['id' => $id]))->toBe(1)
+            ->and(khulan($page->keyKhulan('en'))->isDraft())->toBeTrue();
+        $page = $page->update(['title' => 'English'], 'en');
+        $page = $page->update(['title' => 'Deutsch'], 'de');
+        $page->version('changes')->save(['title' => 'Private'], 'en');
+        expect(khulan(['id' => $id, 'title' => 'Private']))->toBeNull()
+            ->and($page->readContentCache('en')['_content']['flag'])->toBe('0');
+        $page->version('changes')->delete('en');
+        $page = $page->changeStatus('unlisted');
+        expect(khulan()->countDocuments(['id' => $id, 'status' => 'unlisted']))->toBe(2);
+        $page->version('latest')->delete('de');
+        expect($page->readContentCache('de'))->toBeNull()
+            ->and($page->readContentCache('en')['_content']['title'])->toBe('English');
+    } finally {
+        $page->delete();
+    }
+    expect(khulan()->countDocuments(['id' => $id]))->toBe(0);
+});
+
+it('refreshes relation ObjectIds when the target is renamed or deleted', function () {
+    kirby()->impersonate('kirby');
+    $parent = page('home');
+    $target = $parent->createChild(['slug' => 'linked', 'template' => 'default', 'content' => ['title' => 'Target', 'uuid' => 'linkedtestid']]);
+    $source = $parent->createChild(['slug' => 'referrer', 'template' => 'default', 'content' => ['related' => '- page://linkedtestid']]);
+    try {
+        $old = new ObjectId($target->keyKhulan('en'));
+        expect(khulan(['related{}' => $old])->first()->id())->toBe($source->id());
+        $target = $target->changeSlug('renamed');
+        $new = new ObjectId($target->keyKhulan('en'));
+        expect(khulan(['related{}' => $old]))->toBeNull()
+            ->and(khulan(['related{}' => $new])->first()->id())->toBe($source->id());
+        $target->delete();
+        expect(khulan(['related{}' => $new]))->toBeNull()
+            ->and(khulan(['related[]' => 'page://linkedtestid'])->first()->id())->toBe($source->id());
+    } finally {
+        $source->delete();
+        if ($target->exists()) {
+            $target->delete();
+        }
+    }
+});
+
 it('can flush the content cache', function () {
     Khulan::index();
 
@@ -337,11 +392,11 @@ it('can convert documents to models', function () {
     ]);
 
     $models = Khulan::documentsToModels($documents);
-    expect($models)->toBeInstanceOf(\Kirby\Cms\Pages::class);
+    expect($models)->toBeInstanceOf(Pages::class);
 });
 
 it('can encode and decode data for mongodb', function () {
-    /** @var \Bnomei\KhulanPage $page */
+    /** @var KhulanPage $page */
     $page = page('betterharder');
     $data = $page->content()->toArray();
     $encoded = $page->encodeKhulan($data);

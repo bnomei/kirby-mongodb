@@ -28,8 +28,8 @@ use MongoDB\UpdateResult;
 
 use function is_array;
 use function is_bool;
-use function is_object;
 use function is_string;
+use function MongoDB\create_namespace;
 use function MongoDB\is_document;
 use function MongoDB\is_first_key_operator;
 use function MongoDB\is_pipeline;
@@ -49,17 +49,9 @@ class Update implements Executable, Explainable
 {
     private const WIRE_VERSION_FOR_HINT = 8;
 
-    private string $databaseName;
-
-    private string $collectionName;
-
-    /** @var array|object */
-    private $filter;
-
-    /** @var array|object */
-    private $update;
-
     private array $options;
+
+    private string $namespace;
 
     /**
      * Constructs a update command.
@@ -109,14 +101,12 @@ class Update implements Executable, Explainable
      * @param array        $options        Command options
      * @throws InvalidArgumentException for parameter/option parsing errors
      */
-    public function __construct(string $databaseName, string $collectionName, $filter, $update, array $options = [])
+    public function __construct(string $databaseName, private string $collectionName, private array|object $filter, private array|object $update, array $options = [])
     {
+        $this->namespace = create_namespace($databaseName, $collectionName);
+
         if (! is_document($filter)) {
             throw InvalidArgumentException::expectedDocumentType('$filter', $filter);
-        }
-
-        if (! is_array($update) && ! is_object($update)) {
-            throw InvalidArgumentException::invalidType('$update', $filter, 'array or object');
         }
 
         $options += [
@@ -136,8 +126,8 @@ class Update implements Executable, Explainable
             throw InvalidArgumentException::expectedDocumentType('"collation" option', $options['collation']);
         }
 
-        if (isset($options['hint']) && ! is_string($options['hint']) && ! is_array($options['hint']) && ! is_object($options['hint'])) {
-            throw InvalidArgumentException::invalidType('"hint" option', $options['hint'], ['string', 'array', 'object']);
+        if (isset($options['hint']) && ! is_string($options['hint']) && ! is_document($options['hint'])) {
+            throw InvalidArgumentException::expectedDocumentOrStringType('"hint" option', $options['hint']);
         }
 
         if (! is_bool($options['multi'])) {
@@ -164,6 +154,14 @@ class Update implements Executable, Explainable
             throw InvalidArgumentException::expectedDocumentType('"let" option', $options['let']);
         }
 
+        if (isset($options['sort']) && ! is_document($options['sort'])) {
+            throw InvalidArgumentException::expectedDocumentType('"sort" option', $options['sort']);
+        }
+
+        if (isset($options['sort']) && $options['multi']) {
+            throw new InvalidArgumentException('"sort" option cannot be used with multi-document updates');
+        }
+
         if (isset($options['bypassDocumentValidation']) && ! $options['bypassDocumentValidation']) {
             unset($options['bypassDocumentValidation']);
         }
@@ -172,10 +170,6 @@ class Update implements Executable, Explainable
             unset($options['writeConcern']);
         }
 
-        $this->databaseName = $databaseName;
-        $this->collectionName = $collectionName;
-        $this->filter = $filter;
-        $this->update = $update;
         $this->options = $options;
     }
 
@@ -206,7 +200,7 @@ class Update implements Executable, Explainable
         $bulk = new Bulk($this->createBulkWriteOptions());
         $bulk->update($this->filter, $this->update, $this->createUpdateOptions());
 
-        $writeResult = $server->executeBulkWrite($this->databaseName . '.' . $this->collectionName, $bulk, $this->createExecuteOptions());
+        $writeResult = $server->executeBulkWrite($this->namespace, $bulk, $this->createExecuteOptions());
 
         return new UpdateResult($writeResult);
     }
@@ -219,7 +213,11 @@ class Update implements Executable, Explainable
      */
     public function getCommandDocument()
     {
-        $cmd = ['update' => $this->collectionName, 'updates' => [['q' => $this->filter, 'u' => $this->update] + $this->createUpdateOptions()]];
+        /* A non-empty pipeline will encode as a BSON array, so leave it as-is.
+         * Other values (including an empty array) must encode as a document. */
+        $update = is_pipeline($this->update) ? $this->update : (object) $this->update;
+
+        $cmd = ['update' => $this->collectionName, 'updates' => [['q' => (object) $this->filter, 'u' => $update] + $this->createUpdateOptions()]];
 
         if (isset($this->options['bypassDocumentValidation'])) {
             $cmd['bypassDocumentValidation'] = $this->options['bypassDocumentValidation'];
@@ -289,8 +287,10 @@ class Update implements Executable, Explainable
             }
         }
 
-        if (isset($this->options['collation'])) {
-            $updateOptions['collation'] = (object) $this->options['collation'];
+        foreach (['collation', 'sort'] as $option) {
+            if (isset($this->options[$option])) {
+                $updateOptions[$option] = (object) $this->options[$option];
+            }
         }
 
         return $updateOptions;

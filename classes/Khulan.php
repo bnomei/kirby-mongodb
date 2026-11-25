@@ -11,81 +11,80 @@ use Kirby\Cms\Pages;
 use Kirby\Cms\Site;
 use Kirby\Cms\User;
 use Kirby\Cms\Users;
-use Kirby\Data\Data;
-use Kirby\Filesystem\F;
-use Kirby\Toolkit\A;
+use MongoDB\BSON\Regex;
 
 class Khulan
 {
+    /** Rebuild only materialized relations that name this target. */
+    public static function refreshReferences(array $target): void
+    {
+        $prefix = $target['modelType'].'://';
+        $keys = [$prefix.$target['id']];
+        if (isset($target['uuid'])) {
+            $keys[] = $prefix.$target['uuid'];
+        }
+        $collection = Mongodb::singleton()->contentCollection();
+        foreach ($collection->find(['_references' => ['$in' => $keys], 'language' => $target['language']]) as $source) {
+            $storage = self::documentToModel($source)?->storage();
+            if ($storage instanceof KhulanStorage) {
+                $storage->indexLanguage(Language::ensure($target['language'] ?? 'default'));
+            }
+        }
+    }
+
+    public static function removeDocuments(array $filter): void
+    {
+        $collection = Mongodb::singleton()->contentCollection();
+        $targets = $collection->find($filter, ['typeMap' => ['root' => 'array'], 'projection' => ['id' => 1, 'uuid' => 1, 'language' => 1, 'modelType' => 1]])->toArray();
+        $collection->deleteMany($filter);
+        foreach ($targets as $target) {
+            self::refreshReferences($target);
+        }
+    }
+
+    public static function refreshPage(Page $page, ?Page $old = null): void
+    {
+        if (! option('bnomei.mongodb.khulan.write')) {
+            return;
+        }
+
+        $treeChanged = $old === null || $old->id() !== $page->id();
+        $optedOut = $old && KhulanStorage::supports($old) && ! KhulanStorage::supports($page);
+        if ($old && ($treeChanged || $optedOut)) {
+            self::removeDocuments([
+                '$or' => [['modelType' => 'page'], ['modelType' => 'file', 'parentType' => 'page']],
+                'id' => new Regex('^'.preg_quote($old->id()).'(/|$)'),
+            ]);
+        }
+
+        $pages = new Pages([$page]);
+        if ($treeChanged || $optedOut) {
+            $pages = $pages->index(true);
+        }
+        foreach ([$pages, $pages->files()] as $models) {
+            foreach ($models as $model) {
+                if (($storage = $model->storage()) instanceof KhulanStorage) {
+                    $storage->indexLanguages();
+                }
+            }
+        }
+    }
+
     public static function index(int $iterations = 2): array
     {
         $count = 0;
         $time = microtime(true);
 
-        /** @var KhulanPage $page */
-        foreach (site()->index(true) as $page) {
-            if ($page->hasKhulan() !== true) {
-                continue;
+        foreach (kirby()->models() as $model) {
+            if (($storage = $model->storage()) instanceof KhulanStorage) {
+                $storage->indexLanguages();
+                $count++;
             }
-            if (kirby()->multilang()) {
-                /** @var Language $language */
-                foreach (kirby()->languages() as $language) {
-                    $content = $page->content($language->code())->toArray();
-                    $page->writeKhulan($content, $language->code());
-                }
-            } else {
-                $page->writeKhulan($page->content()->toArray());
-            }
-            $count++;
         }
-
-        /** @var KhulanUser $user */
-        foreach (kirby()->users() as $user) {
-            if ($user->hasKhulan() !== true) {
-                continue;
-            }
-            if (kirby()->multilang()) {
-                /** @var Language $language */
-                foreach (kirby()->languages() as $language) {
-                    $content = $user->content($language->code())->toArray();
-                    $user->writeKhulan($content, $language->code());
-                }
-            } else {
-                $user->writeKhulan($user->content()->toArray());
-            }
-            $count++;
-        }
-
-        /** @var KhulanFile $file */
-        foreach (site()->index(true)->files() as $file) {
-            if ($file->hasKhulan() !== true) {
-                continue;
-            }
-            if (kirby()->multilang()) {
-                /** @var Language $language */
-                foreach (kirby()->languages() as $language) {
-                    $contentFile = $file->root().'.'.$language->code().'.txt';
-                    if (! F::exists($contentFile)) {
-                        continue;
-                    }
-                    $file->writeKhulan(Data::read($contentFile), $language->code());
-                }
-            } else {
-                $contentFile = $file->root().'.txt';
-                $file->writeKhulan(Data::read($contentFile));
-            }
-            $count++;
-        }
-
-        $meta = [
-            'count' => $count,
-            'time' => microtime(true) - $time,
-        ];
 
         // call twice by default to make it possible to resolve relations
         if ($iterations > 1) {
-            $iterations--;
-            $meta = self::index($iterations);
+            self::index($iterations - 1);
         }
 
         // add indexes for better performance
@@ -110,11 +109,12 @@ class Khulan
                 if ($isMultilang) {
                     $index['language'] = 1;
                 }
-                khulan()->createIndex($index, ['unique' => true]);
+                Mongodb::singleton()->contentCollection()->createIndex($index);
             }
+            Mongodb::singleton()->contentCollection()->createIndex(['_references' => 1, 'language' => 1]);
         }
 
-        return $meta;
+        return ['count' => $count, 'time' => microtime(true) - $time];
     }
 
     public static function flush(): bool
@@ -124,63 +124,48 @@ class Khulan
         return true;
     }
 
+    /** @return Collection<Page|File|User|Site>|Pages<Page>|Files<File>|Users<User>|null */
     public static function documentsToModels(iterable $documents): Collection|Pages|Files|Users|null
     {
-        $documents = iterator_to_array($documents);
-
-        if (empty($documents)) {
-            return null;
-        }
-
-        $models = [];
-
+        $pages = $files = $users = $models = [];
         foreach ($documents as $document) {
-            $models[] = self::documentToModel($document);
-        }
-
-        $models = array_filter($models, function ($obj) {
-            return $obj !== null;
-        });
-
-        $modelTypes = array_count_values(array_map(function ($document) {
-            return $document['modelType'];
-        }, $documents));
-
-        if (count($modelTypes) === 1) {
-            $modelType = array_key_first($modelTypes);
-            if ($modelType === 'file') {
-                return new Files($models);
-            } elseif ($modelType === 'user') {
-                return new Users($models);
-            } elseif ($modelType === 'page') {
-                return new Pages($models);
+            $model = self::documentToModel($document);
+            if ($model === null) {
+                continue;
             }
-        } else {
-            return new Collection($models);
+            $models[] = $model;
+            match (true) {
+                $model instanceof Page => $pages[] = $model,
+                $model instanceof File => $files[] = $model,
+                $model instanceof User => $users[] = $model,
+                default => null,
+            };
         }
 
-        return null;
+        return match (true) {
+            $models === [] => null,
+            $models === $pages => new Pages($pages),
+            $models === $files => new Files($files),
+            $models === $users => new Users($users),
+            default => new Collection($models),
+        };
     }
 
     public static function documentToModel(mixed $document = null): Page|File|User|Site|null
     {
-        if (! $document) {
+        if (! is_iterable($document)) {
             return null;
         }
+        $document = iterator_to_array($document);
+        $id = $document['id'] ?? $document['uuid'] ?? null;
 
-        if ($document['modelType'] === 'file') {
-            return kirby()->file(strval($document['id'])); // @phpstan-ignore-line
-        } elseif ($document['modelType'] === 'user') {
-            return kirby()->user(strval($document['id'])); // @phpstan-ignore-line
-        } elseif ($document['modelType'] === 'site') {
-            return kirby()->site();
-        } elseif ($document['modelType'] === 'page') {
-            $document = iterator_to_array($document); // @phpstan-ignore-line
-            $id = A::get($document, 'id', A::get($document, 'uuid'));
-
-            return kirby()->page(strval($id));
-        }
-
-        return null;
+        return match ($document['modelType'] ?? null) {
+            'site' => kirby()->site(),
+            'page' => is_string($id) ? kirby()->page($id) : null,
+            'user' => is_string($id) ? kirby()->user($id) : null,
+            'file' => ! is_string($id) ? null : (($document['parentType'] ?? null) === 'user'
+                ? kirby()->user(dirname($id))?->file(basename($id)) : kirby()->file($id)),
+            default => null,
+        };
     }
 }
