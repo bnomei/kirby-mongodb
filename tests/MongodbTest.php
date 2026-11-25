@@ -1,8 +1,13 @@
 <?php
 
 use Bnomei\Khulan;
+use Bnomei\KhulanFile;
+use Bnomei\KhulanPage;
+use Bnomei\KhulanUser;
 use Bnomei\Mongodb;
+use Kirby\Cms\File;
 use Kirby\Cms\Page;
+use Kirby\Cms\Pages;
 use Kirby\Cms\User;
 use Kirby\Cms\Users;
 use MongoDB\BSON\ObjectId;
@@ -222,7 +227,7 @@ it('can find a user by email', function () {
 
     Khulan::index();
 
-    /** @var \Bnomei\KhulanUser $user */
+    /** @var KhulanUser $user */
     $user = kirby()->users()->create([
         'email' => 'test@bnomei.com',
         'role' => 'admin',
@@ -245,13 +250,13 @@ it('can find a user by email', function () {
 it('can find a file', function () {
     Khulan::index();
 
-    /** @var \Bnomei\KhulanFile $file */
+    /** @var KhulanFile $file */
     $file = kirby()->file('betterharder/image.jpg');
-    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+    expect($file)->toBeInstanceOf(File::class)
         ->and($file->filename())->toBe('image.jpg');
 
     $file = khulan('betterharder/image.jpg');
-    expect($file)->toBeInstanceOf(\Kirby\Cms\File::class)
+    expect($file)->toBeInstanceOf(File::class)
         ->and($file->filename())->toBe('image.jpg');
 });
 
@@ -387,11 +392,11 @@ it('can convert documents to models', function () {
     ]);
 
     $models = Khulan::documentsToModels($documents);
-    expect($models)->toBeInstanceOf(\Kirby\Cms\Pages::class);
+    expect($models)->toBeInstanceOf(Pages::class);
 });
 
 it('can encode and decode data for mongodb', function () {
-    /** @var \Bnomei\KhulanPage $page */
+    /** @var KhulanPage $page */
     $page = page('betterharder');
     $data = $page->content()->toArray();
     $encoded = $page->encodeKhulan($data);

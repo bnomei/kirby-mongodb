@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Bnomei;
 
-class KhulanPage extends \Kirby\Cms\Page
+use Kirby\Cms\Page;
+
+class KhulanPage extends Page
 {
     use ModelWithKhulan;
 }

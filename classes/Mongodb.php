@@ -11,6 +11,7 @@ use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
 use MongoDB\Client;
 use MongoDB\Collection;
+use MongoDB\Driver\Exception\Exception;
 
 use function option;
 
@@ -77,7 +78,7 @@ final class Mongodb extends Cache
             $this->client()->selectDatabase($this->options['database'])->command(['ping' => 1]);
 
             return true;
-        } catch (\MongoDB\Driver\Exception\Exception) {
+        } catch (Exception) {
             return false;
         }
     }

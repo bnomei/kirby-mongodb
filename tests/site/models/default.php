@@ -1,6 +1,9 @@
 <?php
 
-class DefaultPage extends \Kirby\Cms\Page
+use Bnomei\ModelWithKhulan;
+use Kirby\Cms\Page;
+
+class DefaultPage extends Page
 {
-    use \Bnomei\ModelWithKhulan;
+    use ModelWithKhulan;
 }

@@ -1,8 +1,11 @@
 <?php
 
-class AdminUser extends \Kirby\Cms\User
+use Bnomei\ModelWithKhulan;
+use Kirby\Cms\User;
+
+class AdminUser extends User
 {
-    use \Bnomei\ModelWithKhulan;
+    use ModelWithKhulan;
 
     public function hello(): string
     {

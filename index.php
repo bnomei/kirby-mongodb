@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Bnomei\Khulan;
 use Bnomei\KhulanStorage;
+use Bnomei\Mongodb;
 use Kirby\CLI\CLI;
 use Kirby\Cms\App;
 use Kirby\Cms\ModelWithContent;
@@ -23,13 +24,13 @@ load([
 ], __DIR__);
 
 if (! function_exists('mongo')) {
-    function mongo(?string $collection = null): \Bnomei\Mongodb|Collection
+    function mongo(?string $collection = null): Mongodb|Collection
     {
         if (! $collection) {
-            return \Bnomei\Mongodb::singleton();
+            return Mongodb::singleton();
         }
 
-        return \Bnomei\Mongodb::singleton()->collection($collection);
+        return Mongodb::singleton()->collection($collection);
     }
 }
 
@@ -37,7 +38,7 @@ if (! function_exists('khulan')) {
 
     function khulan(string|array|null $search = null, ?array $options = null): mixed
     {
-        $collection = \Bnomei\Mongodb::singleton()->contentCollection();
+        $collection = Mongodb::singleton()->contentCollection();
 
         // only get these fields as it is faster and enough for kirby
         $options ??= [
@@ -96,7 +97,7 @@ Kirby::plugin('bnomei/mongodb', [
         ],
     ],
     'cacheTypes' => [
-        'mongodb' => \Bnomei\Mongodb::class,
+        'mongodb' => Mongodb::class,
     ],
     'components' => [
         'storage' => static function (App $kirby, ModelWithContent $model): Storage {
@@ -147,7 +148,7 @@ Kirby::plugin('bnomei/mongodb', [
         'system.loadPlugins:after' => function () {
             if ((option('bnomei.mongodb.khulan.read') ||
                 option('bnomei.mongodb.khulan.write')) &&
-                \Bnomei\Mongodb::singleton()->contentCollection()->countDocuments() === 0) {
+                Mongodb::singleton()->contentCollection()->countDocuments() === 0) {
                 Khulan::index();
             }
         },
