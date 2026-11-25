@@ -23,8 +23,6 @@ use MongoDB\Exception\InvalidArgumentException;
 use MongoDB\Exception\UnsupportedException;
 use MongoDB\UpdateResult;
 
-use function is_array;
-use function is_object;
 use function MongoDB\is_first_key_operator;
 use function MongoDB\is_pipeline;
 
@@ -33,6 +31,8 @@ use function MongoDB\is_pipeline;
  *
  * @see \MongoDB\Collection::updateOne()
  * @see https://mongodb.com/docs/manual/reference/command/update/
+ *
+ * @final extending this class will not be supported in v2.0.0
  */
 class UpdateOne implements Executable, Explainable
 {
@@ -72,6 +72,12 @@ class UpdateOne implements Executable, Explainable
      *    Parameters can then be accessed as variables in an aggregate
      *    expression context (e.g. "$$var").
      *
+     *  * sort (document): Determines which document the operation modifies if
+     *    the query selects multiple documents.
+     *
+     *    This is not supported for server versions < 8.0 and will result in an
+     *    exception at execution time if used.
+     *
      *  * writeConcern (MongoDB\Driver\WriteConcern): Write concern.
      *
      * @param string       $databaseName   Database name
@@ -81,12 +87,8 @@ class UpdateOne implements Executable, Explainable
      * @param array        $options        Command options
      * @throws InvalidArgumentException for parameter/option parsing errors
      */
-    public function __construct(string $databaseName, string $collectionName, $filter, $update, array $options = [])
+    public function __construct(string $databaseName, string $collectionName, array|object $filter, array|object $update, array $options = [])
     {
-        if (! is_array($update) && ! is_object($update)) {
-            throw InvalidArgumentException::invalidType('$update', $update, 'array or object');
-        }
-
         if (! is_first_key_operator($update) && ! is_pipeline($update)) {
             throw new InvalidArgumentException('Expected update operator(s) or non-empty pipeline for $update');
         }

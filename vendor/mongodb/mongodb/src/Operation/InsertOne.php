@@ -28,6 +28,7 @@ use MongoDB\Exception\UnsupportedException;
 use MongoDB\InsertOneResult;
 
 use function is_bool;
+use function MongoDB\create_namespace;
 use function MongoDB\is_document;
 
 /**
@@ -35,17 +36,14 @@ use function MongoDB\is_document;
  *
  * @see \MongoDB\Collection::insertOne()
  * @see https://mongodb.com/docs/manual/reference/command/insert/
+ *
+ * @final extending this class will not be supported in v2.0.0
  */
 class InsertOne implements Executable
 {
-    private string $databaseName;
+    private array|object $document;
 
-    private string $collectionName;
-
-    /** @var array|object */
-    private $document;
-
-    private array $options;
+    private string $namespace;
 
     /**
      * Constructs an insert command.
@@ -72,36 +70,35 @@ class InsertOne implements Executable
      * @param array        $options        Command options
      * @throws InvalidArgumentException for parameter/option parsing errors
      */
-    public function __construct(string $databaseName, string $collectionName, $document, array $options = [])
+    public function __construct(string $databaseName, string $collectionName, array|object $document, private array $options = [])
     {
-        if (isset($options['bypassDocumentValidation']) && ! is_bool($options['bypassDocumentValidation'])) {
-            throw InvalidArgumentException::invalidType('"bypassDocumentValidation" option', $options['bypassDocumentValidation'], 'boolean');
+        $this->namespace = create_namespace($databaseName, $collectionName);
+
+        if (isset($this->options['bypassDocumentValidation']) && ! is_bool($this->options['bypassDocumentValidation'])) {
+            throw InvalidArgumentException::invalidType('"bypassDocumentValidation" option', $this->options['bypassDocumentValidation'], 'boolean');
         }
 
-        if (isset($options['codec']) && ! $options['codec'] instanceof DocumentCodec) {
-            throw InvalidArgumentException::invalidType('"codec" option', $options['codec'], DocumentCodec::class);
+        if (isset($this->options['codec']) && ! $this->options['codec'] instanceof DocumentCodec) {
+            throw InvalidArgumentException::invalidType('"codec" option', $this->options['codec'], DocumentCodec::class);
         }
 
-        if (isset($options['session']) && ! $options['session'] instanceof Session) {
-            throw InvalidArgumentException::invalidType('"session" option', $options['session'], Session::class);
+        if (isset($this->options['session']) && ! $this->options['session'] instanceof Session) {
+            throw InvalidArgumentException::invalidType('"session" option', $this->options['session'], Session::class);
         }
 
-        if (isset($options['writeConcern']) && ! $options['writeConcern'] instanceof WriteConcern) {
-            throw InvalidArgumentException::invalidType('"writeConcern" option', $options['writeConcern'], WriteConcern::class);
+        if (isset($this->options['writeConcern']) && ! $this->options['writeConcern'] instanceof WriteConcern) {
+            throw InvalidArgumentException::invalidType('"writeConcern" option', $this->options['writeConcern'], WriteConcern::class);
         }
 
-        if (isset($options['bypassDocumentValidation']) && ! $options['bypassDocumentValidation']) {
-            unset($options['bypassDocumentValidation']);
+        if (isset($this->options['bypassDocumentValidation']) && ! $this->options['bypassDocumentValidation']) {
+            unset($this->options['bypassDocumentValidation']);
         }
 
-        if (isset($options['writeConcern']) && $options['writeConcern']->isDefault()) {
-            unset($options['writeConcern']);
+        if (isset($this->options['writeConcern']) && $this->options['writeConcern']->isDefault()) {
+            unset($this->options['writeConcern']);
         }
 
-        $this->databaseName = $databaseName;
-        $this->collectionName = $collectionName;
-        $this->document = $this->validateDocument($document, $options['codec'] ?? null);
-        $this->options = $options;
+        $this->document = $this->validateDocument($document, $this->options['codec'] ?? null);
     }
 
     /**
@@ -123,7 +120,7 @@ class InsertOne implements Executable
 
         $insertedId = $bulk->insert($this->document);
 
-        $writeResult = $server->executeBulkWrite($this->databaseName . '.' . $this->collectionName, $bulk, $this->createExecuteOptions());
+        $writeResult = $server->executeBulkWrite($this->namespace, $bulk, $this->createExecuteOptions());
 
         return new InsertOneResult($writeResult, $insertedId);
     }
@@ -166,11 +163,8 @@ class InsertOne implements Executable
         return $options;
     }
 
-    /**
-     * @param array|object $document
-     * @return array|object
-     */
-    private function validateDocument($document, ?DocumentCodec $codec)
+    /** @return array|object */
+    private function validateDocument(array|object $document, ?DocumentCodec $codec)
     {
         if ($codec) {
             $document = $codec->encode($document);

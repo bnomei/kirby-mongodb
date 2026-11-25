@@ -1,8 +1,8 @@
 <?php return array(
     'root' => array(
         'name' => 'bnomei/kirby-mongodb',
-        'pretty_version' => '1.4.4',
-        'version' => '1.4.4.0',
+        'pretty_version' => '6.0.0',
+        'version' => '6.0.0.0',
         'reference' => null,
         'type' => 'kirby-plugin',
         'install_path' => __DIR__ . '/../../',
@@ -11,8 +11,8 @@
     ),
     'versions' => array(
         'bnomei/kirby-mongodb' => array(
-            'pretty_version' => '1.4.4',
-            'version' => '1.4.4.0',
+            'pretty_version' => '6.0.0',
+            'version' => '6.0.0.0',
             'reference' => null,
             'type' => 'kirby-plugin',
             'install_path' => __DIR__ . '/../../',
@@ -28,10 +28,16 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'mongodb/builder' => array(
+            'dev_requirement' => false,
+            'replaced' => array(
+                0 => '*',
+            ),
+        ),
         'mongodb/mongodb' => array(
-            'pretty_version' => '1.20.0',
-            'version' => '1.20.0.0',
-            'reference' => '75da9ea3b63d97b05e0e8648d8c09a17bc54c0b6',
+            'pretty_version' => '1.21.6',
+            'version' => '1.21.6.0',
+            'reference' => 'f069d2cb1c97ca69efd3f9325c81d29b00290112',
             'type' => 'library',
             'install_path' => __DIR__ . '/../mongodb/mongodb',
             'aliases' => array(),
@@ -43,24 +49,6 @@
             'reference' => 'f16e1d5863e37f8d8c2a01719f5b34baa2b714d3',
             'type' => 'library',
             'install_path' => __DIR__ . '/../psr/log',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
-        'symfony/polyfill-php80' => array(
-            'pretty_version' => 'v1.31.0',
-            'version' => '1.31.0.0',
-            'reference' => '60328e362d4c2c802a54fcbf04f9d3fb892b4cf8',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../symfony/polyfill-php80',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
-        'symfony/polyfill-php81' => array(
-            'pretty_version' => 'v1.31.0',
-            'version' => '1.31.0.0',
-            'reference' => '4a4cfc2d253c21a5ad0e53071df248ed48c6ce5c',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../symfony/polyfill-php81',
             'aliases' => array(),
             'dev_requirement' => false,
         ),

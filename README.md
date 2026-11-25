@@ -1,5 +1,6 @@
 # 🐎 Khulan - Kirby MongoDB
 
+![Kirby 6](https://img.shields.io/badge/Kirby-6-black)
 ![Release](https://flat.badgen.net/packagist/v/bnomei/kirby-mongodb?color=ae81ff&icon=github&label)
 [![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da&icon=discord&label)](https://discordapp.com/users/bnomei)
 [![Buymecoffee](https://flat.badgen.net/badge/icon/donate?icon=buymeacoffee&color=FF813F&label)](https://www.buymeacoffee.com/bnomei)
@@ -7,6 +8,8 @@
 Khulan is a cache driver and content cache with NoSQL interface for Kirby using MongoDB.
 
 ## Installation
+
+This version is for Kirby 6 and PHP 8.3 or later. Enable the `mongodb` PHP extension from the 1.21 series, including in the PHP runtime serving Kirby. Archive and submodule installs include the MongoDB PHP library; Composer installs resolve it in the site's own `vendor` directory.
 
 - unzip [master.zip](https://github.com/bnomei/kirby-mongodb/archive/master.zip) as folder `site/plugins/kirby-mongodb`
   or
@@ -48,11 +51,19 @@ class DefaultPage extends \Kirby\Cms\Page
 ```
 
 > [!NOTE]
-> You can also use the trait for user models. File models are patched automatically.
+> You can also use the trait for user models. Files of opted-in parents are included by default; Kirby core files are never patched.
+
+### Upgrading to Kirby 6
+
+Khulan uses Kirby's `storage` component to mirror each saved `latest` version **after** the plain-text write. Draft pages are indexed with `status: draft`; private edits in the `changes` version are not indexed until published. An untranslated page has no MongoDB document for that language: Kirby still handles the fallback on reads. Queries can include draft pages; filter by `status` when exposing search results publicly.
+
+Start with an unmodified Kirby 6 install (replace an older, patched Kirby core if applicable). Set `bnomei.mongodb.collections.content` to a **new, empty collection** dedicated to this index, then run `kirby khulan:index`. Verify your queries before retiring the old collection. The new document keys include the model type and language: use Kirby UUIDs rather than persisting the old MongoDB ObjectIds. Neither Kirby content files nor the separate key/value cache collection need to be removed.
+
+Plain-text content remains authoritative. After an out-of-band import or a failed MongoDB write, rebuild into a fresh collection from those files. This integration assumes Kirby's native plain-text storage; do not combine it with a second plugin that replaces the `storage` component without explicitly integrating the two.
 
 ## Kirby's Content goes NoSQL
 
-The plugin writes the content cache to a collection named `khulan` in the database. You can query this collection
+The plugin writes the content cache to `bnomei.mongodb.collections.content` (default: `kirby`). You can query this collection
 directly. It is **not** wrapped in an Cache object. This allows you to treat all your Kirby content as a NoSQL database.
 
 ```php
@@ -289,7 +300,7 @@ return [
 | auto-clean-cache         | `true`      | will clean the cache once before the first get()                              |
 | khulan.read              | `false`     | read from cache is disabled by default as loading from file might be faster   |
 | khulan.write             | `true`      | write to cache for all models that use the ModelWithKhulan trait              |
-| khulan.patch-files-class | `true`      | monkey-patch the \Kirby\CMS\Files class to use Khulan for caching its content |
+| khulan.patch-files-class | `true`      | include file metadata for opted-in parents (legacy option name; no core patch) |
 
 ## Disclaimer
 
@@ -303,4 +314,3 @@ please [create a new issue](https://github.com/bnomei/kirby-mongodb/issues/new).
 
 It is discouraged to use this plugin in any project that promotes racism, sexism, homophobia, animal abuse, violence or
 any other form of hate speech.
-
